@@ -5,33 +5,15 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-use error::SsError;
+use error::Error;
+use session::decrypt;
 use session::Session;
-use ss::{
-    SS_DBUS_NAME,
-    SS_INTERFACE_ITEM,
-    SS_INTERFACE_SERVICE,
-    SS_PATH,
-};
-use ss_crypto::decrypt;
-use util::{
-    exec_prompt,
-    format_secret,
-    Interface,
-};
+use ss::{SS_DBUS_NAME, SS_INTERFACE_ITEM, SS_INTERFACE_SERVICE, SS_PATH};
+use util::{exec_prompt, format_secret, Interface};
 
-use dbus::{
-    BusName,
-    Connection,
-    MessageItem,
-    Path,
-};
-use dbus::MessageItem::{
-    Array,
-    ObjectPath,
-    Str,
-};
 use dbus::Interface as InterfaceName;
+use dbus::MessageItem::{Array, ObjectPath, Str};
+use dbus::{BusName, Connection, MessageItem, Path};
 use std::rc::Rc;
 
 // Helper enum for locking
@@ -51,21 +33,18 @@ pub struct Item<'a> {
 }
 
 impl<'a> Item<'a> {
-    pub fn new(bus: Rc<Connection>,
-               session: &'a Session,
-               item_path: Path
-               ) -> Self {
+    pub fn new(bus: Rc<Connection>, session: &'a Session, item_path: Path) -> Self {
         let item_interface = Interface::new(
             bus.clone(),
             BusName::new(SS_DBUS_NAME).unwrap(),
             item_path.clone(),
-            InterfaceName::new(SS_INTERFACE_ITEM).unwrap()
+            InterfaceName::new(SS_INTERFACE_ITEM).unwrap(),
         );
         let service_interface = Interface::new(
             bus.clone(),
             BusName::new(SS_DBUS_NAME).unwrap(),
             Path::new(SS_PATH).unwrap(),
-            InterfaceName::new(SS_INTERFACE_SERVICE).unwrap()
+            InterfaceName::new(SS_INTERFACE_SERVICE).unwrap(),
         );
         Item {
             bus,
@@ -76,16 +55,15 @@ impl<'a> Item<'a> {
         }
     }
 
-    pub fn is_locked(&self) -> ::Result<bool> {
-        self.item_interface.get_props("Locked")
-            .map(|locked| {
-                locked.inner().unwrap()
-            })
+    pub fn is_locked(&self) -> Result<bool, Error> {
+        self.item_interface
+            .get_props("Locked")
+            .map(|locked| locked.inner().unwrap())
     }
 
-    pub fn ensure_unlocked(&self) -> ::Result<()> {
+    pub fn ensure_unlocked(&self) -> Result<(), Error> {
         if self.is_locked()? {
-            Err(SsError::Locked)
+            Err(Error::Locked)
         } else {
             Ok(())
         }
@@ -93,17 +71,17 @@ impl<'a> Item<'a> {
 
     //Helper function for locking and unlocking
     // TODO: refactor into utils? It should be same as collection
-    fn lock_or_unlock(&self, lock_action: LockAction) -> ::Result<()> {
-        let objects = MessageItem::new_array(
-            vec![ObjectPath(self.item_path.clone())]
-        ).unwrap();
+    fn lock_or_unlock(&self, lock_action: LockAction) -> Result<(), Error> {
+        let objects = MessageItem::new_array(vec![ObjectPath(self.item_path.clone())]).unwrap();
 
         let lock_action_str = match lock_action {
             LockAction::Lock => "Lock",
             LockAction::Unlock => "Unlock",
         };
 
-        let res = self.service_interface.method(lock_action_str, vec![objects])?;
+        let res = self
+            .service_interface
+            .method(lock_action_str, vec![objects])?;
         if let Some(&Array(ref unlocked, _)) = res.get(0) {
             if unlocked.is_empty() {
                 if let Some(&ObjectPath(ref path)) = res.get(1) {
@@ -114,40 +92,43 @@ impl<'a> Item<'a> {
         Ok(())
     }
 
-    pub fn unlock(&self) -> ::Result<()> {
+    pub fn unlock(&self) -> Result<(), Error> {
         self.lock_or_unlock(LockAction::Unlock)
     }
 
-    pub fn lock(&self) -> ::Result<()> {
+    pub fn lock(&self) -> Result<(), Error> {
         println!("locked!");
         self.lock_or_unlock(LockAction::Lock)
     }
 
-    pub fn get_attributes(&self) -> ::Result<Vec<(String, String)>> {
+    pub fn get_attributes(&self) -> Result<Vec<(String, String)>, Error> {
         let res = self.item_interface.get_props("Attributes")?;
 
         if let Array(attributes, _) = res {
-            return Ok(attributes.iter().map(|ref dict_entry| {
-                let entry: (&MessageItem, &MessageItem) = dict_entry.inner().unwrap();
-                let key: &String = entry.0.inner().unwrap();
-                let value: &String= entry.1.inner().unwrap();
-                (key.clone(), value.clone())
-            }).collect::<Vec<(String, String)>>())
+            return Ok(attributes
+                .iter()
+                .map(|ref dict_entry| {
+                    let entry: (&MessageItem, &MessageItem) = dict_entry.inner().unwrap();
+                    let key: &String = entry.0.inner().unwrap();
+                    let value: &String = entry.1.inner().unwrap();
+                    (key.clone(), value.clone())
+                })
+                .collect::<Vec<(String, String)>>());
         } else {
-            Err(SsError::Parse)
+            Err(Error::Parse)
         }
     }
 
     // Probably best example of creating dict
-    pub fn set_attributes(&self, attributes: Vec<(&str, &str)>) -> ::Result<()> {
+    pub fn set_attributes(&self, attributes: Vec<(&str, &str)>) -> Result<(), Error> {
         if !attributes.is_empty() {
-            let attributes_dict_entries: Vec<_> = attributes.iter().map(|&(ref key, ref value)| {
-                let dict_entry = (
-                    MessageItem::from(*key),
-                    MessageItem::from(*value)
-                );
-                MessageItem::from(dict_entry)
-            }).collect();
+            let attributes_dict_entries: Vec<_> = attributes
+                .iter()
+                .map(|&(ref key, ref value)| {
+                    let dict_entry = (MessageItem::from(*key), MessageItem::from(*value));
+                    MessageItem::from(dict_entry)
+                })
+                .collect();
             let attributes_dict = MessageItem::new_array(attributes_dict_entries).unwrap();
             self.item_interface.set_props("Attributes", attributes_dict)
         } else {
@@ -155,21 +136,22 @@ impl<'a> Item<'a> {
         }
     }
 
-    pub fn get_label(&self) -> ::Result<String> {
+    pub fn get_label(&self) -> Result<String, Error> {
         let label = self.item_interface.get_props("Label")?;
         if let Str(label_str) = label {
             Ok(label_str)
         } else {
-            Err(SsError::Parse)
+            Err(Error::Parse)
         }
     }
 
-    pub fn set_label(&self, new_label: &str) -> ::Result<()> {
-        self.item_interface.set_props("Label", Str(new_label.to_owned()))
+    pub fn set_label(&self, new_label: &str) -> Result<(), Error> {
+        self.item_interface
+            .set_props("Label", Str(new_label.to_owned()))
     }
 
     /// Deletes dbus object, but struct instance still exists (current implementation)
-    pub fn delete(&self) -> ::Result<()> {
+    pub fn delete(&self) -> Result<(), Error> {
         //Because of ensure_unlocked, no prompt is really necessary
         //basically,you must explicitly unlock first
         self.ensure_unlocked()?;
@@ -177,75 +159,72 @@ impl<'a> Item<'a> {
 
         if let Some(&ObjectPath(ref prompt_path)) = prompt.get(0) {
             if &**prompt_path != "/" {
-                    let del_res = exec_prompt(self.bus.clone(), prompt_path.clone())?;
-                    println!("{:?}", del_res);
-                    return Ok(());
+                let del_res = exec_prompt(self.bus.clone(), prompt_path.clone())?;
+                println!("{:?}", del_res);
+                return Ok(());
             } else {
                 return Ok(());
             }
         }
         // If for some reason the patterns don't match, return error
-        Err(SsError::Parse)
+        Err(Error::Parse)
     }
 
-    pub fn get_secret(&self) -> ::Result<Vec<u8>> {
+    pub fn get_secret(&self) -> Result<Vec<u8>, Error> {
         let session = MessageItem::from(self.session.object_path.clone());
         let res = self.item_interface.method("GetSecret", vec![session])?;
         // No secret would be an error, so try! instead of option
-        let secret_struct = res
-            .get(0)
-            .ok_or(SsError::NoResult)?;
+        let secret_struct = res.get(0).ok_or(Error::NoResult)?;
 
         // parse out secret
 
         // get "secret" field out of secret struct
         // secret should always be index 2
         let secret_vec: &Vec<_> = secret_struct.inner().unwrap();
-        let secret_dbus = secret_vec
-            .get(2)
-            .ok_or(SsError::NoResult)?;
+        let secret_dbus = secret_vec.get(2).ok_or(Error::NoResult)?;
 
         // get array of dbus bytes
         let secret_bytes_dbus: &Vec<_> = secret_dbus.inner().unwrap();
 
         // map dbus bytes to u8
-        let secret: Vec<_> = secret_bytes_dbus.iter().map(|byte| byte.inner::<u8>().unwrap()).collect();
+        let secret: Vec<_> = secret_bytes_dbus
+            .iter()
+            .map(|byte| byte.inner::<u8>().unwrap())
+            .collect();
 
         if !self.session.is_encrypted() {
             Ok(secret)
         } else {
             // get "param" (aes_iv) field out of secret struct
             // param should always be index 1
-            let aes_iv_dbus = secret_vec
-                .get(1)
-                .ok_or(SsError::NoResult)?;
+            let aes_iv_dbus = secret_vec.get(1).ok_or(Error::NoResult)?;
             // get array of dbus bytes
             let aes_iv_bytes_dbus: &Vec<_> = aes_iv_dbus.inner().unwrap();
             // map dbus bytes to u8
-            let aes_iv: Vec<_> = aes_iv_bytes_dbus.iter().map(|byte| byte.inner::<u8>().unwrap()).collect();
+            let aes_iv: Vec<_> = aes_iv_bytes_dbus
+                .iter()
+                .map(|byte| byte.inner::<u8>().unwrap())
+                .collect();
 
             // decrypt
-            let decrypted_secret = decrypt(&secret[..], &self.session.get_aes_key()[..], &aes_iv[..]).unwrap();
+            let decrypted_secret =
+                decrypt(&secret[..], &self.session.get_aes_key()[..], &aes_iv[..]).unwrap();
             Ok(decrypted_secret)
         }
     }
 
-    pub fn get_secret_content_type(&self) -> ::Result<String> {
+    pub fn get_secret_content_type(&self) -> Result<String, Error> {
         let session = MessageItem::from(self.session.object_path.clone());
         let res = self.item_interface.method("GetSecret", vec![session])?;
         // No secret content type would be a bug, so try!
-        let secret_struct = res
-            .get(0)
-            .ok_or(SsError::NoResult)?;
+        let secret_struct = res.get(0).ok_or(Error::NoResult)?;
 
         // parse out secret content type
 
         // get "content type" field out of secret struct
         // content type should always be index 3
         let secret_vec: &Vec<_> = secret_struct.inner().unwrap();
-        let content_type_dbus = secret_vec
-            .get(3)
-            .ok_or(SsError::NoResult)?;
+        let content_type_dbus = secret_vec.get(3).ok_or(Error::NoResult)?;
 
         // Get value out of DBus value
         let content_type: &String = content_type_dbus.inner().unwrap();
@@ -253,49 +232,51 @@ impl<'a> Item<'a> {
         Ok(content_type.clone())
     }
 
-    pub fn set_secret(&self, secret: &[u8], content_type: &str) -> ::Result<()> {
+    pub fn set_secret(&self, secret: &[u8], content_type: &str) -> Result<(), Error> {
         let secret_struct = format_secret(&self.session, secret, content_type)?;
-        self.item_interface.method("SetSecret", vec![secret_struct]).map(|_| ())
+        self.item_interface
+            .method("SetSecret", vec![secret_struct])
+            .map(|_| ())
     }
 
-    pub fn get_created(&self) -> ::Result<u64> {
-        self.item_interface.get_props("Created")
-            .map(|locked| {
-                locked.inner::<u64>().unwrap()
-            })
+    pub fn get_created(&self) -> Result<u64, Error> {
+        self.item_interface
+            .get_props("Created")
+            .map(|locked| locked.inner::<u64>().unwrap())
     }
 
-    pub fn get_modified(&self) -> ::Result<u64> {
-        self.item_interface.get_props("Modified")
-            .map(|locked| {
-                locked.inner::<u64>().unwrap()
-            })
+    pub fn get_modified(&self) -> Result<u64, Error> {
+        self.item_interface
+            .get_props("Modified")
+            .map(|locked| locked.inner::<u64>().unwrap())
     }
 }
 
 impl<'a> Eq for Item<'a> {}
 impl<'a> PartialEq for Item<'a> {
     fn eq(&self, other: &Item) -> bool {
-        self.item_path == other.item_path &&
-        self.get_attributes().unwrap() == other.get_attributes().unwrap()
+        self.item_path == other.item_path
+            && self.get_attributes().unwrap() == other.get_attributes().unwrap()
     }
 }
 
 #[cfg(test)]
-mod test{
+mod test {
     use super::super::*;
 
     #[test]
     fn should_create_and_delete_item() {
         let ss = SecretService::new(EncryptionType::Plain).unwrap();
         let collection = ss.get_default_collection().unwrap();
-        let item = collection.create_item(
-            "Test",
-            Vec::new(),
-            b"test",
-            false, // replace
-            "text/plain" // content_type
-        ).unwrap();
+        let item = collection
+            .create_item(
+                "Test",
+                Vec::new(),
+                b"test",
+                false,        // replace
+                "text/plain", // content_type
+            )
+            .unwrap();
         let _ = item.item_path.clone(); // to prepare for future drop for delete?
         item.delete().unwrap();
         // Random operation to prove that path no longer exists
@@ -309,13 +290,15 @@ mod test{
     fn should_check_if_item_locked() {
         let ss = SecretService::new(EncryptionType::Plain).unwrap();
         let collection = ss.get_default_collection().unwrap();
-        let item = collection.create_item(
-            "Test",
-            Vec::new(),
-            b"test",
-            false, // replace
-            "text/plain" // content_type
-        ).unwrap();
+        let item = collection
+            .create_item(
+                "Test",
+                Vec::new(),
+                b"test",
+                false,        // replace
+                "text/plain", // content_type
+            )
+            .unwrap();
         item.is_locked().unwrap();
         item.delete().unwrap();
     }
@@ -325,13 +308,15 @@ mod test{
     fn should_lock_and_unlock() {
         let ss = SecretService::new(EncryptionType::Plain).unwrap();
         let collection = ss.get_default_collection().unwrap();
-        let item = collection.create_item(
-            "Test",
-            Vec::new(),
-            b"test",
-            false, // replace
-            "text/plain" // content_type
-        ).unwrap();
+        let item = collection
+            .create_item(
+                "Test",
+                Vec::new(),
+                b"test",
+                false,        // replace
+                "text/plain", // content_type
+            )
+            .unwrap();
         let locked = item.is_locked().unwrap();
         if locked {
             item.unlock().unwrap();
@@ -353,13 +338,15 @@ mod test{
     fn should_get_and_set_item_label() {
         let ss = SecretService::new(EncryptionType::Plain).unwrap();
         let collection = ss.get_default_collection().unwrap();
-        let item = collection.create_item(
-            "Test",
-            Vec::new(),
-            b"test",
-            false, // replace
-            "text/plain" // content_type
-        ).unwrap();
+        let item = collection
+            .create_item(
+                "Test",
+                Vec::new(),
+                b"test",
+                false,        // replace
+                "text/plain", // content_type
+            )
+            .unwrap();
 
         // Set label to test and check
         item.set_label("Tester").unwrap();
@@ -374,15 +361,20 @@ mod test{
     fn should_create_with_item_attributes() {
         let ss = SecretService::new(EncryptionType::Plain).unwrap();
         let collection = ss.get_default_collection().unwrap();
-        let item = collection.create_item(
-            "Test",
-            vec![("test_attributes_in_item", "test")],
-            b"test",
-            false, // replace
-            "text/plain" // content_type
-        ).unwrap();
+        let item = collection
+            .create_item(
+                "Test",
+                vec![("test_attributes_in_item", "test")],
+                b"test",
+                false,        // replace
+                "text/plain", // content_type
+            )
+            .unwrap();
         let attributes = item.get_attributes().unwrap();
-        assert_eq!(attributes, vec![("test_attributes_in_item".into(), "test".into())]);
+        assert_eq!(
+            attributes,
+            vec![("test_attributes_in_item".into(), "test".into())]
+        );
         println!("Attributes: {:?}", attributes);
         item.delete().unwrap();
         //assert!(false);
@@ -392,19 +384,25 @@ mod test{
     fn should_get_and_set_item_attributes() {
         let ss = SecretService::new(EncryptionType::Plain).unwrap();
         let collection = ss.get_default_collection().unwrap();
-        let item = collection.create_item(
-            "Test",
-            Vec::new(),
-            b"test",
-            false, // replace
-            "text/plain" // content_type
-        ).unwrap();
+        let item = collection
+            .create_item(
+                "Test",
+                Vec::new(),
+                b"test",
+                false,        // replace
+                "text/plain", // content_type
+            )
+            .unwrap();
         // Also test empty array handling
         item.set_attributes(vec![]).unwrap();
-        item.set_attributes(vec![("test_attributes_in_item_get", "test")]).unwrap();
+        item.set_attributes(vec![("test_attributes_in_item_get", "test")])
+            .unwrap();
         let attributes = item.get_attributes().unwrap();
         println!("Attributes: {:?}", attributes);
-        assert_eq!(attributes, vec![("test_attributes_in_item_get".into(), "test".into())]);
+        assert_eq!(
+            attributes,
+            vec![("test_attributes_in_item_get".into(), "test".into())]
+        );
         item.delete().unwrap();
         //assert!(false);
     }
@@ -412,13 +410,15 @@ mod test{
     fn should_get_modified_created_props() {
         let ss = SecretService::new(EncryptionType::Plain).unwrap();
         let collection = ss.get_default_collection().unwrap();
-        let item = collection.create_item(
-            "Test",
-            Vec::new(),
-            b"test",
-            false, // replace
-            "text/plain" // content_type
-        ).unwrap();
+        let item = collection
+            .create_item(
+                "Test",
+                Vec::new(),
+                b"test",
+                false,        // replace
+                "text/plain", // content_type
+            )
+            .unwrap();
         item.set_label("Tester").unwrap();
         let created = item.get_created().unwrap();
         let modified = item.get_modified().unwrap();
@@ -431,13 +431,15 @@ mod test{
     fn should_create_and_get_secret() {
         let ss = SecretService::new(EncryptionType::Plain).unwrap();
         let collection = ss.get_default_collection().unwrap();
-        let item = collection.create_item(
-            "Test",
-            Vec::new(),
-            b"test",
-            false, // replace
-            "text/plain" // content_type
-        ).unwrap();
+        let item = collection
+            .create_item(
+                "Test",
+                Vec::new(),
+                b"test",
+                false,        // replace
+                "text/plain", // content_type
+            )
+            .unwrap();
         let secret = item.get_secret().unwrap();
         item.delete().unwrap();
         assert_eq!(secret, b"test");
@@ -447,13 +449,15 @@ mod test{
     fn should_create_and_get_secret_encrypted() {
         let ss = SecretService::new(EncryptionType::Dh).unwrap();
         let collection = ss.get_default_collection().unwrap();
-        let item = collection.create_item(
-            "Test",
-            Vec::new(),
-            b"test",
-            false, // replace
-            "text/plain" // content_type
-        ).unwrap();
+        let item = collection
+            .create_item(
+                "Test",
+                Vec::new(),
+                b"test",
+                false,        // replace
+                "text/plain", // content_type
+            )
+            .unwrap();
         let secret = item.get_secret().unwrap();
         item.delete().unwrap();
         assert_eq!(secret, b"test");
@@ -463,13 +467,15 @@ mod test{
     fn should_get_secret_content_type() {
         let ss = SecretService::new(EncryptionType::Plain).unwrap();
         let collection = ss.get_default_collection().unwrap();
-        let item = collection.create_item(
-            "Test",
-            Vec::new(),
-            b"test",
-            false, // replace
-            "text/plain" // content_type, defaults to text/plain
-        ).unwrap();
+        let item = collection
+            .create_item(
+                "Test",
+                Vec::new(),
+                b"test",
+                false,        // replace
+                "text/plain", // content_type, defaults to text/plain
+            )
+            .unwrap();
         let content_type = item.get_secret_content_type().unwrap();
         item.delete().unwrap();
         assert_eq!(content_type, "text/plain".to_owned());
@@ -479,13 +485,15 @@ mod test{
     fn should_set_secret() {
         let ss = SecretService::new(EncryptionType::Plain).unwrap();
         let collection = ss.get_default_collection().unwrap();
-        let item = collection.create_item(
-            "Test",
-            Vec::new(),
-            b"test",
-            false, // replace
-            "text/plain" // content_type
-        ).unwrap();
+        let item = collection
+            .create_item(
+                "Test",
+                Vec::new(),
+                b"test",
+                false,        // replace
+                "text/plain", // content_type
+            )
+            .unwrap();
         item.set_secret(b"new_test", "text/plain").unwrap();
         let secret = item.get_secret().unwrap();
         item.delete().unwrap();
@@ -497,13 +505,15 @@ mod test{
     fn should_create_encrypted_item() {
         let ss = SecretService::new(EncryptionType::Dh).unwrap();
         let collection = ss.get_default_collection().unwrap();
-        let item = collection.create_item(
-            "Test",
-            Vec::new(),
-            b"test_encrypted",
-            false, // replace
-            "text/plain" // content_type
-        ).expect("Error on item creation");
+        let item = collection
+            .create_item(
+                "Test",
+                Vec::new(),
+                b"test_encrypted",
+                false,        // replace
+                "text/plain", // content_type
+            )
+            .expect("Error on item creation");
         let secret = item.get_secret().unwrap();
         item.delete().unwrap();
         assert_eq!(secret, b"test_encrypted");
@@ -515,13 +525,15 @@ mod test{
         //empty string
         let ss = SecretService::new(EncryptionType::Dh).unwrap();
         let collection = ss.get_default_collection().unwrap();
-        let item = collection.create_item(
-            "Test",
-            Vec::new(),
-            b"",
-            false, // replace
-            "text/plain" // content_type
-        ).expect("Error on item creation");
+        let item = collection
+            .create_item(
+                "Test",
+                Vec::new(),
+                b"",
+                false,        // replace
+                "text/plain", // content_type
+            )
+            .expect("Error on item creation");
         let secret = item.get_secret().unwrap();
         item.delete().unwrap();
         assert_eq!(secret, b"");
@@ -533,26 +545,27 @@ mod test{
         {
             let ss = SecretService::new(EncryptionType::Dh).unwrap();
             let collection = ss.get_default_collection().unwrap();
-            let item = collection.create_item(
-                "Test",
-                vec![("test_attributes_in_item_encrypt", "test")],
-                b"test_encrypted",
-                false, // replace
-                "text/plain" // content_type
-            ).expect("Error on item creation");
+            let item = collection
+                .create_item(
+                    "Test",
+                    vec![("test_attributes_in_item_encrypt", "test")],
+                    b"test_encrypted",
+                    false,        // replace
+                    "text/plain", // content_type
+                )
+                .expect("Error on item creation");
             let secret = item.get_secret().unwrap();
             assert_eq!(secret, b"test_encrypted");
         }
         {
             let ss = SecretService::new(EncryptionType::Dh).unwrap();
             let collection = ss.get_default_collection().unwrap();
-            let search_item = collection.search_items(
-                vec![("test_attributes_in_item_encrypt", "test")]
-            ).unwrap();
+            let search_item = collection
+                .search_items(vec![("test_attributes_in_item_encrypt", "test")])
+                .unwrap();
             let item = search_item.get(0).unwrap().clone();
             assert_eq!(item.get_secret().unwrap(), b"test_encrypted");
             item.delete().unwrap();
         }
     }
 }
-

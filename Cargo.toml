@@ -1,20 +1,20 @@
 [package]
-authors = ["Walther Chen <walther.chen@gmail.com>"]
-description = "Library to interface with Secret Service API"
-documentation = "https://hwchen.github.io/secret-service-rs/secret_service"
-homepage = "https://github.com/hwchen/secret-service-rs.git"
-keywords = ["secret-service", "password", "linux", "keychain"]
+authors = ["Daniel Brotsky <dan@brotsky.com>", "Walther Chen <walther.chen@gmail.com>"]
+description = "Access the Secret Service API via dbus"
+homepage = "https://github.com/brotskydotcom/dbus-secret-service.git"
+keywords = ["secret-service", "password", "linux", "keychain", "dbus"]
 license = "MIT OR Apache-2.0"
 name = "secret-service"
-repository = "https://github.com/hwchen/secret-service-rs.git"
-version = "1.1.3"
+repository = "https://github.com/brotskydotcom/dbus-secret-service.git"
+version = "4.0.0"
 
 [dependencies]
-aes = "0.6.0"
-block-modes = "0.7.0"
-dbus = "0.2.3"
-hkdf = "0.10"
-lazy_static = "1.3.0"
-num = "0.3.0"
-rand = "0.7.3"
-sha2 = "0.9.0"
+aes = "0.8"
+cbc = { version = "0.1", features = ["block-padding", "alloc"], optional = true }
+dbus = { version = "0.9", features = ["vendored"] }
+generic-array = "1"
+hkdf = "0.12.0"
+num = "0.4"
+once_cell = "1"
+rand = "0.8"
+sha2 = "0.10"

@@ -1,38 +1,47 @@
-# Secret Service
+# dbus-secret-service
 
-Secret Service Rust library.
+This crate is a knock-off of the 
+[hwchen/secret-service](https://crates.io/crates/secret-service)
+crate, which is currently at version 4
+and uses
+[zbus](https://crates.io/crates/zbus)
+to access the secret service.  The basic
+collection, item and search APIs in this
+crate are meant to work the same as the
+blocking APIs in the zbus-based crate.
 
-Interfaces with the Linux Secret Service API through dbus.
+Why do a knock-off?  So that folks who write
+synchronous Rust apps that access the secret
+service (typically through the
+[hwchen/keyring](https://crates.io/crates/keyring)
+crate) are not required to add an async
+runtime. Because this knock-off uses lib-dbus,
+it doesn't require an async runtime.
 
-This library is feature complete, has stabilized its API, and has removed extraneous dependencies, so I've made it 1.0.
-
-### Documentation
-
-[Get Docs!](https://docs.rs/secret-service/1.0.0/secret_service/)
+Why is this crate starting at version 4?
+Since it's API is sync'd to a particular
+version of the dbus-based crate, I figured
+it would be clearest if it's version
+number was sync'd as well.
 
 ### Basic Usage
 
-Requires dbus library.
+Just in case it wasn't clear from the above,
+in order to use this crate on a given machine,
+you will need to have `libdbus` installed.
+Most do, but if yours doesn't then
+search your package manager for `dbus`.
 
-On ubuntu, this is libdbus-1-dev when building, and libdbus-1-3 when running.
-
-In Cargo.toml:
+In `Cargo.toml`:
 
 ```
 [dependencies]
-secret-service = "1.1.3"
-```
-
-If you have `cargo-extras` installed, can replace above step with the command at the prompt in your project directory:
-
-```
-$ cargo add secret-service
+secret-service = "4"
 ```
 
 In source code (below example is for --bin, not --lib)
 
 ```rust
-extern crate secret_service;
 use secret_service::SecretService;
 use secret_service::EncryptionType;
 use std::error::Error;
@@ -76,17 +85,11 @@ fn main() -> Result<(), Box<Error>> {
 - Collections: create, delete, search.
 - Items: create, delete, search, get/set secret.
 
-
 ### Changelog
-_0.1.0_
-- dependency on gmp is removed.
-- rust-crypto replaced by RustCrypto.
-- as a result of above, error on encrypting and decrypting blank input is fixed.
 
-_0.4.0_
-- gmp is now optional dependency.
-- gmp upgraded to 0.3 to fix "private-in-public" warnings which will be hard errors soon.
-
+v4.0.0: first release,
+based on the hwchen's original implementation
+and only offering Rust-native crypto.
 
 ## License
 
@@ -99,5 +102,9 @@ at your option.
 
 ### Contribution
 
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
-  
+Unless you explicitly state otherwise, 
+any contribution intentionally submitted
+for inclusion in the work by you, 
+as defined in the Apache-2.0 license, 
+shall be dual licensed as above, 
+without any additional terms or conditions.

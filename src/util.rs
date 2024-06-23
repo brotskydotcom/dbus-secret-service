@@ -14,7 +14,7 @@
 //   formatting secrets be in crypto? Should interfaces
 //   have their own module?
 
-use error::SsError;
+use error::Error;
 use session::Session;
 use ss::{
     SS_DBUS_NAME,
@@ -67,7 +67,7 @@ impl Interface {
 
     pub fn method(&self,
                   method_name: &str,
-                  args: Vec<MessageItem>) -> ::Result<Vec<MessageItem>> {
+                  args: Vec<MessageItem>) -> Result<Vec<MessageItem>, Error> {
         // Should never fail, so unwrap
         let mut m = Message::new_method_call(
             self.name.clone(),
@@ -84,7 +84,7 @@ impl Interface {
         Ok(r.get_items())
     }
 
-    pub fn get_props(&self, prop_name: &str) -> ::Result<MessageItem> {
+    pub fn get_props(&self, prop_name: &str) -> Result<MessageItem, Error> {
         let p = Props::new(
             &self.bus,
             self.name.clone(),
@@ -96,7 +96,7 @@ impl Interface {
         Ok(p.get(prop_name)?)
     }
 
-    pub fn set_props(&self, prop_name: &str, value: MessageItem) -> ::Result<()> {
+    pub fn set_props(&self, prop_name: &str, value: MessageItem) -> Result<(), Error> {
         let p = Props::new(
             &self.bus,
             self.name.clone(),
@@ -112,7 +112,7 @@ impl Interface {
 pub fn format_secret(session: &Session,
                      secret: &[u8],
                      content_type: &str
-                    ) -> ::Result<MessageItem> {
+                    ) -> Result<MessageItem, Error> {
 
     if session.is_encrypted() {
         let mut rng = OsRng {};
@@ -152,7 +152,7 @@ pub fn format_secret(session: &Session,
     }
 }
 
-pub fn exec_prompt(bus: Rc<Connection>, prompt: Path) -> ::Result<MessageItem> {
+pub fn exec_prompt(bus: Rc<Connection>, prompt: Path) -> Result<MessageItem, Error> {
     let prompt_interface = Interface::new(
         bus.clone(),
         BusName::new(SS_DBUS_NAME).unwrap(),
@@ -171,7 +171,7 @@ pub fn exec_prompt(bus: Rc<Connection>, prompt: Path) -> ::Result<MessageItem> {
             if let Some(&Bool(dismissed)) = items.get(0) {
                 //println!("Was prompt dismissed? {:?}", dismissed);
                 if dismissed {
-                    return Err(SsError::Prompt);
+                    return Err(Error::Prompt);
                 }
             }
             if let Some(&ref result) = items.get(1) {
@@ -179,6 +179,6 @@ pub fn exec_prompt(bus: Rc<Connection>, prompt: Path) -> ::Result<MessageItem> {
             }
         }
     }
-    Err(SsError::Prompt)
+    Err(Error::Prompt)
 }
 

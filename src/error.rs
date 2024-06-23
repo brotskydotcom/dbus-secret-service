@@ -22,17 +22,13 @@
 // - locked (currently custom dbus error)
 // - prompt dismissed (not an error?) (currently custom dbus error)
 
-use dbus;
 use std::error;
 use std::fmt;
 
-/// Result type often returned from methods that have SsError.
-/// Fns in this library return ::Result<T> when using this alias.
-// (This pattern is something I saw in hyper)
-pub type Result<T> = ::std::result::Result<T, SsError>;
+use dbus;
 
 #[derive(Debug)]
-pub enum SsError {
+pub enum Error {
     Crypto(String),
     Dbus(dbus::Error),
     Locked,
@@ -41,55 +37,42 @@ pub enum SsError {
     Prompt,
 }
 
-impl fmt::Display for SsError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt:: Result {
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             // crypto error does not implement Display
-            SsError::Crypto(_) => write!(f, "Crypto error: Invalid Length or Padding"),
-            SsError::Dbus(ref err) => write!(f, "Dbus error: {}", err),
-            SsError::Locked => write!(f, "SS Error: object locked"),
-            SsError::NoResult => write!(f, "SS error: result not returned from SS API"),
-            SsError::Parse => write!(f, "SS error: could not parse Dbus output"),
-            SsError::Prompt => write!(f, "SS error: prompt dismissed"),
+            Error::Crypto(_) => write!(f, "Crypto error: Invalid Length or Padding"),
+            Error::Dbus(ref err) => write!(f, "Dbus error: {}", err),
+            Error::Locked => write!(f, "SS Error: object locked"),
+            Error::NoResult => write!(f, "SS error: result not returned from SS API"),
+            Error::Parse => write!(f, "SS error: could not parse Dbus output"),
+            Error::Prompt => write!(f, "SS error: prompt dismissed"),
         }
     }
 }
 
-impl error::Error for SsError {
+impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
-            SsError::Crypto(_) => "crypto: Invalid Length or Padding",
-            SsError::Dbus(ref err) => err.description(),
-            SsError::Locked => "Object locked",
-            SsError::NoResult => "Result not returned from SS API",
-            SsError::Parse => "Error parsing Dbus output",
-            SsError::Prompt => "Prompt Dismissed",
+            Error::Crypto(_) => "crypto: Invalid Length or Padding",
+            Error::Dbus(ref err) => &err.to_string(),
+            Error::Locked => "Object locked",
+            Error::NoResult => "Result not returned from Secret Service API",
+            Error::Parse => "Error parsing Dbus output",
+            Error::Prompt => "Prompt Dismissed",
         }
     }
 
     fn cause(&self) -> Option<&dyn error::Error> {
         match *self {
-            SsError::Dbus(ref err) => Some(err),
+            Error::Dbus(ref err) => Some(err),
             _ => None,
         }
     }
 }
 
-impl From<block_modes::BlockModeError> for SsError {
-    fn from(_err: block_modes::BlockModeError) -> SsError {
-        SsError::Crypto("Block mode error".into())
+impl From<dbus::Error> for Error {
+    fn from(err: dbus::Error) -> Error {
+        Error::Dbus(err)
     }
 }
-
-impl From<block_modes::InvalidKeyIvLength> for SsError {
-    fn from(_err: block_modes::InvalidKeyIvLength) -> SsError {
-        SsError::Crypto("Invalid Key Iv Lengt".into())
-    }
-}
-
-impl From<dbus::Error> for SsError {
-    fn from(err: dbus::Error) -> SsError {
-        SsError::Dbus(err)
-    }
-}
-
