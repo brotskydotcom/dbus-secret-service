@@ -93,7 +93,11 @@ and only offering Rust-native crypto.
 
 ## License
 
-Licensed under either of
+The copyright to all material in this repository belongs to
+the collective of contributors who have checked material in to
+this repository.
+
+All material is this repository is licensed under either of
 
 * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
 * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)

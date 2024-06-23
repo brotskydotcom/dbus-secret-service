@@ -1,4 +1,4 @@
-// Copyright 2024 by contributing developers
+// Copyright 2016-2024 dbus-secret-service Contributors
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
