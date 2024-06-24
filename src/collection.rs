@@ -5,19 +5,21 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-use error::Error;
-use item::Item;
-use session::Session;
-use ss::{
+use std::fmt::Formatter;
+use std::rc::Rc;
+
+use dbus::arg::messageitem::MessageItem::{Array, Bool, Dict, ObjectPath, Str, Variant};
+use dbus::strings::Interface;
+use dbus::{arg::messageitem::MessageItem, blocking::SyncConnection, strings::BusName, Path};
+
+use crate::error::Error;
+use crate::item::Item;
+use crate::session::Session;
+use crate::ss::{
     SS_DBUS_NAME, SS_INTERFACE_COLLECTION, SS_INTERFACE_SERVICE, SS_ITEM_ATTRIBUTES, SS_ITEM_LABEL,
     SS_PATH,
 };
-use util::{exec_prompt, format_secret, Interface};
-
-use dbus::arg::messageitem::MessageItem::{Array, Bool, Dict, ObjectPath, Str, Variant};
-use dbus::strings::Interface as InterfaceName;
-use dbus::{arg::messageitem::MessageItem, blocking::Connection, strings::BusName, Path};
-use std::rc::Rc;
+use crate::util::{exec_prompt, format_secret, InterfaceWrapper};
 
 // Helper enum for
 // locking and unlocking
@@ -29,29 +31,37 @@ enum LockAction {
 // Collection struct.
 // Should always be created from the SecretService entry point,
 // whether through a new collection or a collection search
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Collection<'a> {
-    // TODO: Implement method for path?
-    bus: Rc<Connection>,
+    bus: Rc<SyncConnection>,
     session: &'a Session<'a>,
     pub collection_path: Path<'a>,
-    collection_interface: Interface,
-    service_interface: Interface,
+    collection_interface: InterfaceWrapper<'a>,
+    service_interface: InterfaceWrapper<'a>,
+}
+
+impl std::fmt::Debug for Collection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Collection")
+            .field("session", &self.session)
+            .field("path", &self.collection_path)
+            .field("")
+    }
 }
 
 impl<'a> Collection<'a> {
-    pub fn new(bus: Rc<Connection>, session: &'a Session, collection_path: Path) -> Self {
-        let collection_interface = Interface::new(
+    pub fn new(bus: Rc<SyncConnection>, session: &'a Session, collection_path: Path) -> Self {
+        let collection_interface = InterfaceWrapper::new(
             bus.clone(),
             BusName::new(SS_DBUS_NAME).unwrap(),
             collection_path.clone(),
-            InterfaceName::new(SS_INTERFACE_COLLECTION).unwrap(),
+            Interface::new(SS_INTERFACE_COLLECTION).unwrap(),
         );
-        let service_interface = Interface::new(
+        let service_interface = InterfaceWrapper::new(
             bus.clone(),
             BusName::new(SS_DBUS_NAME).unwrap(),
             Path::new(SS_PATH).unwrap(),
-            InterfaceName::new(SS_INTERFACE_SERVICE).unwrap(),
+            Interface::new(SS_INTERFACE_SERVICE).unwrap(),
         );
         Collection {
             bus,

@@ -28,8 +28,9 @@ use std::fmt;
 use dbus;
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
-    Crypto(String),
+    Crypto(&'static str),
     Dbus(dbus::Error),
     Locked,
     NoResult,

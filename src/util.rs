@@ -14,50 +14,45 @@
 //   formatting secrets be in crypto? Should interfaces
 //   have their own module?
 
-use error::Error;
-use session::Session;
-use ss::{
-    SS_DBUS_NAME,
-    SS_INTERFACE_PROMPT,
-};
-use ss_crypto::encrypt;
-
-use dbus::{
-    BusName,
-    Connection,
-    Message,
-    MessageItem,
-    Path,
-    Props,
-};
-use dbus::ConnectionItem::Signal;
-use dbus::Interface as InterfaceName;
-use dbus::MessageItem::{
-    Array,
-    Bool,
-    Byte,
-    ObjectPath,
-    Str,
-    Struct,
-};
-use rand::{Rng, rngs::OsRng};
+use std::fmt::Formatter;
 use std::rc::Rc;
 
-#[derive(Debug, Clone)]
-pub struct Interface {
-    bus: Rc<Connection>,
-    name: BusName,
-    path: Path,
-    interface: InterfaceName,
+use dbus::{
+    arg::messageitem::{MessageItem, Props},
+    blocking::SyncConnection,
+    strings::{BusName, Interface},
+    Message,
+    MessageType::Signal,
+    Path,
+};
+use rand::{rngs::OsRng, Rng};
+use MessageItem::{Array, Bool, Byte, ObjectPath, Str, Struct};
+
+use crate::error::Error;
+use crate::session::{encrypt, Session};
+use crate::ss::{SS_DBUS_NAME, SS_INTERFACE_PROMPT};
+
+#[derive(Clone)]
+pub struct InterfaceWrapper<'a> {
+    bus: Rc<SyncConnection>,
+    name: BusName<'a>,
+    path: Path<'a>,
+    interface: Interface<'a>,
 }
 
-impl Interface {
-    pub fn new(bus: Rc<Connection>,
-               name: BusName,
-               path: Path,
-               interface: InterfaceName) -> Self {
+impl std::fmt::Debug for InterfaceWrapper {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InterfaceWrapper")
+            .field("name", &self.name)
+            .field("path", &self.path)
+            .field("interface", &self.interface)
+            .finish()
+    }
+}
 
-        Interface {
+impl InterfaceWrapper {
+    pub fn new(bus: Rc<SyncConnection>, name: BusName, path: Path, interface: Interface) -> Self {
+        InterfaceWrapper {
             bus,
             name,
             path,
@@ -65,16 +60,19 @@ impl Interface {
         }
     }
 
-    pub fn method(&self,
-                  method_name: &str,
-                  args: Vec<MessageItem>) -> Result<Vec<MessageItem>, Error> {
+    pub fn method(
+        &self,
+        method_name: &str,
+        args: Vec<MessageItem>,
+    ) -> Result<Vec<MessageItem>, Error> {
         // Should never fail, so unwrap
         let mut m = Message::new_method_call(
             self.name.clone(),
             self.path.clone(),
             self.interface.clone(),
-            method_name)
-            .unwrap();
+            method_name,
+        )
+        .unwrap();
 
         m.append_items(&args);
 
@@ -90,7 +88,7 @@ impl Interface {
             self.name.clone(),
             self.path.clone(),
             self.interface.clone(),
-            2000
+            2000,
         );
 
         Ok(p.get(prop_name)?)
@@ -102,24 +100,24 @@ impl Interface {
             self.name.clone(),
             self.path.clone(),
             self.interface.clone(),
-            2000
+            2000,
         );
 
         Ok(p.set(prop_name, value)?)
     }
 }
 
-pub fn format_secret(session: &Session,
-                     secret: &[u8],
-                     content_type: &str
-                    ) -> Result<MessageItem, Error> {
-
+pub fn format_secret(
+    session: &Session,
+    secret: &[u8],
+    content_type: &str,
+) -> Result<MessageItem, Error> {
     if session.is_encrypted() {
         let mut rng = OsRng {};
-        let mut aes_iv = [0;16];
+        let mut aes_iv = [0; 16];
         rng.fill(&mut aes_iv);
 
-        let encrypted_secret = encrypt(secret, &session.get_aes_key()[..], &aes_iv)?;
+        let encrypted_secret = encrypt(secret, &session.get_shared_key(), &aes_iv)?;
 
         // Construct secret struct
         // (These are all straight conversions, can't fail.
@@ -133,9 +131,8 @@ pub fn format_secret(session: &Session,
             object_path,
             parameters,
             value_dbus,
-            content_type
+            content_type,
         ]))
-
     } else {
         // just Plain for now
         let object_path = ObjectPath(session.object_path.clone());
@@ -147,17 +144,17 @@ pub fn format_secret(session: &Session,
             object_path,
             parameters,
             value_dbus,
-            content_type
+            content_type,
         ]))
     }
 }
 
-pub fn exec_prompt(bus: Rc<Connection>, prompt: Path) -> Result<MessageItem, Error> {
-    let prompt_interface = Interface::new(
+pub fn exec_prompt(bus: Rc<SyncConnection>, prompt: Path) -> Result<MessageItem, Error> {
+    let prompt_interface = InterfaceWrapper::new(
         bus.clone(),
         BusName::new(SS_DBUS_NAME).unwrap(),
         prompt,
-        InterfaceName::new(SS_INTERFACE_PROMPT).unwrap()
+        Interface::new(SS_INTERFACE_PROMPT).unwrap(),
     );
     prompt_interface.method("Prompt", vec![Str("".to_owned())])?;
 
@@ -165,7 +162,7 @@ pub fn exec_prompt(bus: Rc<Connection>, prompt: Path) -> Result<MessageItem, Err
     // TODO: Find a better way to do this.
     // Also, should I return the paths in the result?
     for event in bus.iter(5000) {
-        if let Signal(message) =  event {
+        if let Signal(message) = event {
             //println!("Incoming Signal {:?}", message);
             let items = message.get_items();
             if let Some(&Bool(dismissed)) = items.get(0) {
@@ -181,4 +178,3 @@ pub fn exec_prompt(bus: Rc<Connection>, prompt: Path) -> Result<MessageItem, Err
     }
     Err(Error::Prompt)
 }
-

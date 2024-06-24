@@ -128,12 +128,13 @@ pub use item::Item;
 pub use session::EncryptionType;
 use session::Session;
 use ss::{SS_DBUS_NAME, SS_INTERFACE_SERVICE, SS_PATH};
-use util::{exec_prompt, Interface};
+use util::{exec_prompt, InterfaceWrapper};
 
 use dbus::arg::messageitem::MessageItem::{Array, DictEntry, ObjectPath, Str, Variant};
-use dbus::strings::Interface as InterfaceName;
+use dbus::strings::Interface;
 use dbus::{
-    arg::messageitem::MessageItem, blocking::Connection, channel::BusType, strings::BusName, Path,
+    arg::messageitem::MessageItem, blocking::SyncConnection, channel::BusType, strings::BusName,
+    Path,
 };
 use std::rc::Rc;
 
@@ -148,9 +149,9 @@ use std::rc::Rc;
 // Interfaces are the dbus namespace for methods
 #[derive(Debug, Clone)]
 pub struct SecretService<'a> {
-    bus: Rc<Connection>,
+    bus: Rc<SyncConnection>,
     session: Session<'a>,
-    service_interface: Interface,
+    service_interface: InterfaceWrapper,
 }
 
 impl<'a> SecretService<'a> {
@@ -164,13 +165,13 @@ impl<'a> SecretService<'a> {
     /// let ss = SecretService::new(EncryptionType::Dh).unwrap();
     /// ```
     pub fn new(encryption: EncryptionType) -> Result<SecretService<'a>, Error> {
-        let bus = Rc::new(Connection::get_private(BusType::Session)?);
+        let bus = Rc::new(SyncConnection::get_private(BusType::Session)?);
         let session = Session::new(bus.clone(), encryption)?;
-        let service_interface = Interface::new(
+        let service_interface = InterfaceWrapper::new(
             bus.clone(),
             BusName::new(SS_DBUS_NAME).unwrap(),
             Path::new(SS_PATH).unwrap(),
-            InterfaceName::new(SS_INTERFACE_SERVICE).unwrap(),
+            Interface::new(SS_INTERFACE_SERVICE).unwrap(),
         );
 
         Ok(SecretService {

@@ -1,12 +1,16 @@
 [package]
-authors = ["Daniel Brotsky <dan@brotsky.com>", "Walther Chen <walther.chen@gmail.com>"]
-description = "Access the Secret Service API via dbus"
-homepage = "https://github.com/brotskydotcom/dbus-secret-service.git"
-keywords = ["secret-service", "password", "linux", "keychain", "dbus"]
-license = "MIT OR Apache-2.0"
-name = "secret-service"
+name = "dbus-secret-service"
 repository = "https://github.com/brotskydotcom/dbus-secret-service.git"
 version = "4.0.0"
+authors = ["Daniel Brotsky <dan@brotsky.com>", "Walther Chen <walther.chen@gmail.com>"]
+description = "Access the Secret Service API via dbus"
+homepage = "https://github.com/brotskydotcom/dbus-secret-service"
+keywords = ["secret-service", "password", "linux", "keychain", "dbus"]
+license = "MIT OR Apache-2.0"
+rust-version = "1.68"
+edition = "2021"
+exclude = [".github/"]
+readme = "README.md"
 
 [dependencies]
 aes = "0.8"

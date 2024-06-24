@@ -1,16 +1,16 @@
 # dbus-secret-service
 
-This crate is a knock-off of the 
+This crate is a knock-off of the
 [hwchen/secret-service](https://crates.io/crates/secret-service)
 crate, which is currently at version 4
 and uses
 [zbus](https://crates.io/crates/zbus)
-to access the secret service.  The basic
+to access the secret service. The basic
 collection, item and search APIs in this
 crate are meant to work the same as the
 blocking APIs in the zbus-based crate.
 
-Why do a knock-off?  So that folks who write
+Why do a knock-off? So that folks who write
 synchronous Rust apps that access the secret
 service (typically through the
 [hwchen/keyring](https://crates.io/crates/keyring)
@@ -36,7 +36,7 @@ In `Cargo.toml`:
 
 ```
 [dependencies]
-secret-service = "4"
+dbus-secret-service = "4"
 ```
 
 In source code (below example is for --bin, not --lib)
@@ -106,9 +106,9 @@ at your option.
 
 ### Contribution
 
-Unless you explicitly state otherwise, 
+Unless you explicitly state otherwise,
 any contribution intentionally submitted
-for inclusion in the work by you, 
-as defined in the Apache-2.0 license, 
-shall be dual licensed as above, 
+for inclusion in the work by you,
+as defined in the Apache-2.0 license,
+shall be dual licensed as above,
 without any additional terms or conditions.

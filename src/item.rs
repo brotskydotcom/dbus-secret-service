@@ -5,16 +5,17 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-use error::Error;
-use session::decrypt;
-use session::Session;
-use ss::{SS_DBUS_NAME, SS_INTERFACE_ITEM, SS_INTERFACE_SERVICE, SS_PATH};
-use util::{exec_prompt, format_secret, Interface};
-
-use dbus::Interface as InterfaceName;
-use dbus::MessageItem::{Array, ObjectPath, Str};
-use dbus::{BusName, Connection, MessageItem, Path};
 use std::rc::Rc;
+
+use dbus::arg::messageitem::MessageItem::{Array, ObjectPath, Str};
+use dbus::strings::Interface;
+use dbus::{arg::messageitem::MessageItem, blocking::SyncConnection, strings::BusName, Path};
+
+use crate::error::Error;
+use crate::session::decrypt;
+use crate::session::Session;
+use crate::ss::{SS_DBUS_NAME, SS_INTERFACE_ITEM, SS_INTERFACE_SERVICE, SS_PATH};
+use crate::util::{exec_prompt, format_secret, InterfaceWrapper};
 
 // Helper enum for locking
 enum LockAction {
@@ -25,26 +26,26 @@ enum LockAction {
 #[derive(Debug)]
 pub struct Item<'a> {
     // TODO: Implement method for path?
-    bus: Rc<Connection>,
+    bus: Rc<SyncConnection>,
     session: &'a Session,
     pub item_path: Path,
-    item_interface: Interface,
-    service_interface: Interface,
+    item_interface: InterfaceWrapper,
+    service_interface: InterfaceWrapper,
 }
 
 impl<'a> Item<'a> {
-    pub fn new(bus: Rc<Connection>, session: &'a Session, item_path: Path) -> Self {
-        let item_interface = Interface::new(
+    pub fn new(bus: Rc<SyncConnection>, session: &'a Session, item_path: Path) -> Self {
+        let item_interface = InterfaceWrapper::new(
             bus.clone(),
             BusName::new(SS_DBUS_NAME).unwrap(),
             item_path.clone(),
-            InterfaceName::new(SS_INTERFACE_ITEM).unwrap(),
+            Interface::new(SS_INTERFACE_ITEM).unwrap(),
         );
-        let service_interface = Interface::new(
+        let service_interface = InterfaceWrapper::new(
             bus.clone(),
             BusName::new(SS_DBUS_NAME).unwrap(),
             Path::new(SS_PATH).unwrap(),
-            InterfaceName::new(SS_INTERFACE_SERVICE).unwrap(),
+            Interface::new(SS_INTERFACE_SERVICE).unwrap(),
         );
         Item {
             bus,
@@ -208,7 +209,7 @@ impl<'a> Item<'a> {
 
             // decrypt
             let decrypted_secret =
-                decrypt(&secret[..], &self.session.get_aes_key()[..], &aes_iv[..]).unwrap();
+                decrypt(&secret[..], &self.session.get_aes_key(), &aes_iv[..]).unwrap();
             Ok(decrypted_secret)
         }
     }
