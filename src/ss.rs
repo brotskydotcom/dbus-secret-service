@@ -1,4 +1,4 @@
-//Copyright 2022 secret-service-rs Developers
+// Copyright 2016-2024 dbus-secret-service Contributors
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -8,7 +8,8 @@
 // Definitions for secret service interactions
 
 // DBus Name
-pub const SS_DBUS_NAME: &str = "org.freedesktop.secrets";
+pub const SS_DBUS_DEST: &str = "org.freedesktop.secrets";
+pub const SS_DBUS_PATH: &str = "/org/freedesktop/secrets";
 
 // Item Properties
 pub const SS_ITEM_LABEL: &str = "org.freedesktop.Secret.Item.Label";

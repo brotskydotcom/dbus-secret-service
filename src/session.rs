@@ -1,4 +1,4 @@
-//Copyright 2022 secret-service-rs Developers
+// Copyright 2016-2024 dbus-secret-service Contributors
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -8,20 +8,19 @@
 // key exchange and crypto for session:
 // 1. Before session negotiation (openSession), set private key and public key using DH method.
 // 2. In session negotiation, send public key.
-// 3. As result of session negotiation, get object path for session, which (I think
-//      it means that it uses the same server public key to create an aes key which is used
-//      to decode the encoded secret using the aes seed that's sent with the secret).
-// 4. As result of session negotition, get server public key.
-// 5. Use server public key, my private key, to set an aes key using HKDF.
-// 6. Format Secret: aes iv is random seed, in secret struct it's the parameter (Array(Byte))
-// 7. Format Secret: encode the secret value for the value field in secret struct.
+// 3. In session negotiation, exchange my public key for server's public key.
+// 4. Use server public key and my private key to derive a shared AES key using HKDF.
+// 5. Format Secret: aes iv is random seed, in secret struct it's the parameter (Array(Byte))
+// 6. Format Secret: encode the secret value for the value field in secret struct.
 //      This encoding uses the aes_key from the associated Session.
 
-use crate::proxy::service::{OpenSessionResult, ServiceProxy, ServiceProxyBlocking};
-use crate::ss::{ALGORITHM_DH, ALGORITHM_PLAIN};
-use crate::Error;
+use std::ops::{Mul, Rem, Shr};
 
-use generic_array::{typenum::U16, GenericArray};
+use dbus::{
+    arg::{cast, RefArg, Variant},
+    blocking::{Connection, Proxy},
+    Path,
+};
 use num::{
     bigint::BigUint,
     integer::Integer,
@@ -30,9 +29,9 @@ use num::{
 };
 use once_cell::sync::Lazy;
 use rand::{rngs::OsRng, Rng};
-use zbus::zvariant::OwnedObjectPath;
 
-use std::ops::{Mul, Rem, Shr};
+use crate::error::Error;
+use crate::ss::{ALGORITHM_DH, ALGORITHM_PLAIN};
 
 // for key exchange
 static DH_GENERATOR: Lazy<BigUint> = Lazy::new(|| BigUint::from_u64(0x2).unwrap());
@@ -53,11 +52,11 @@ static DH_PRIME: Lazy<BigUint> = Lazy::new(|| {
 #[allow(unused_macros)]
 macro_rules! feature_needed {
     () => {
-        compile_error!("Please enable a feature to pick a runtime (such as rt-async-io-crypto-rust or rt-tokio-crypto-rust) for the secret-service crate")
-    }
+        compile_error!("You must specify a crypto feature for the dbus-secret-service crate")
+    };
 }
 
-type AesKey = GenericArray<u8, U16>;
+type AesKey = [u8; 16];
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum EncryptionType {
@@ -65,6 +64,7 @@ pub enum EncryptionType {
     Dh,
 }
 
+#[derive(Clone)]
 struct Keypair {
     private: BigUint,
     public: BigUint,
@@ -77,7 +77,7 @@ impl Keypair {
         rng.fill(&mut private_key_bytes);
 
         let private_key = BigUint::from_bytes_be(&private_key_bytes);
-        let public_key = powm(&DH_GENERATOR, &private_key, &DH_PRIME);
+        let public_key = pow_base_exp_mod(&DH_GENERATOR, &private_key, &DH_PRIME);
 
         Self {
             private: private_key,
@@ -87,11 +87,11 @@ impl Keypair {
 
     fn derive_shared(&self, server_public_key: &BigUint) -> AesKey {
         // Derive the shared secret the server and us.
-        let common_secret = powm(server_public_key, &self.private, &DH_PRIME);
+        let common_secret = pow_base_exp_mod(server_public_key, &self.private, &DH_PRIME);
 
-        let mut common_secret_bytes = common_secret.to_bytes_be();
+        let common_secret_bytes = common_secret.to_bytes_be();
         let mut common_secret_padded = vec![0; 128 - common_secret_bytes.len()];
-        common_secret_padded.append(&mut common_secret_bytes);
+        common_secret_padded.extend(common_secret_bytes);
 
         // hkdf
 
@@ -103,7 +103,7 @@ impl Keypair {
         let mut okm = [0; 16];
         hkdf(ikm, salt, &mut okm);
 
-        GenericArray::clone_from_slice(&okm)
+        okm
     }
 }
 
@@ -129,11 +129,10 @@ fn hkdf(ikm: Vec<u8>, salt: Option<&[u8]>, okm: &mut [u8]) {
 
 #[cfg(feature = "crypto-rust")]
 fn hkdf(ikm: Vec<u8>, salt: Option<&[u8]>, okm: &mut [u8]) {
-    use hkdf::Hkdf;
     use sha2::Sha256;
 
     let info = [];
-    let (_, hk) = Hkdf::<Sha256>::extract(salt, &ikm);
+    let (_, hk) = hkdf::Hkdf::<Sha256>::extract(salt, &ikm);
     hk.expand(&info, okm)
         .expect("hkdf expand should never fail");
 }
@@ -143,86 +142,8 @@ fn hkdf(ikm: Vec<u8>, salt: Option<&[u8]>, okm: &mut [u8]) {
     feature_needed!()
 }
 
-pub struct Session {
-    pub object_path: OwnedObjectPath,
-    aes_key: Option<AesKey>,
-}
-
-impl Session {
-    fn encrypted_session(keypair: &Keypair, session: OpenSessionResult) -> Result<Self, Error> {
-        let server_public_key = session
-            .output
-            .try_into()
-            .map(|key: Vec<u8>| BigUint::from_bytes_be(&key))?;
-
-        let aes_key = keypair.derive_shared(&server_public_key);
-
-        Ok(Session {
-            object_path: session.result,
-            aes_key: Some(aes_key),
-        })
-    }
-
-    pub fn new_blocking(
-        service_proxy: &ServiceProxyBlocking,
-        encryption: EncryptionType,
-    ) -> Result<Self, Error> {
-        match encryption {
-            EncryptionType::Plain => {
-                let session = service_proxy.open_session(ALGORITHM_PLAIN, "".into())?;
-                let session_path = session.result;
-
-                Ok(Session {
-                    object_path: session_path,
-                    aes_key: None,
-                })
-            }
-            EncryptionType::Dh => {
-                let keypair = Keypair::generate();
-
-                let session = service_proxy
-                    .open_session(ALGORITHM_DH, keypair.public.to_bytes_be().into())?;
-
-                Self::encrypted_session(&keypair, session)
-            }
-        }
-    }
-
-    pub async fn new(
-        service_proxy: &ServiceProxy<'_>,
-        encryption: EncryptionType,
-    ) -> Result<Self, Error> {
-        match encryption {
-            EncryptionType::Plain => {
-                let session = service_proxy
-                    .open_session(ALGORITHM_PLAIN, "".into())
-                    .await?;
-                let session_path = session.result;
-
-                Ok(Session {
-                    object_path: session_path,
-                    aes_key: None,
-                })
-            }
-            EncryptionType::Dh => {
-                let keypair = Keypair::generate();
-
-                let session = service_proxy
-                    .open_session(ALGORITHM_DH, keypair.public.to_bytes_be().into())
-                    .await?;
-
-                Self::encrypted_session(&keypair, session)
-            }
-        }
-    }
-
-    pub fn get_aes_key(&self) -> Option<&AesKey> {
-        self.aes_key.as_ref()
-    }
-}
-
 /// from https://github.com/plietar/librespot/blob/master/core/src/util/mod.rs#L53
-fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
+fn pow_base_exp_mod(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
     let mut base = base.clone();
     let mut exp = exp.clone();
     let mut result: BigUint = One::one();
@@ -238,29 +159,157 @@ fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
     result
 }
 
+pub(crate) struct EncryptedSecret {
+    path: Path<'static>,     // the session path
+    salt: Vec<u8>,           // the salt for the encrypted data
+    data: Vec<u8>,           // the encrypted data
+    pub(crate) mime: String, // the mime type of the decrypted data
+}
+
+impl EncryptedSecret {
+    pub(crate) fn from_dbus(value: (Path<'static>, Vec<u8>, Vec<u8>, String)) -> Self {
+        Self {
+            path: value.0,
+            salt: value.1,
+            data: value.2,
+            mime: value.3.to_string(),
+        }
+    }
+
+    pub(crate) fn to_dbus(&self) -> (Path<'static>, Vec<u8>, Vec<u8>, &str) {
+        (
+            self.path.clone(),
+            self.salt.clone(),
+            self.data.clone(),
+            &self.mime,
+        )
+    }
+}
+
+#[derive(Clone)]
+pub struct Session {
+    pub(crate) path: Path<'static>,
+    keypair: Option<Keypair>,
+    shared_key: Option<AesKey>,
+}
+
+impl std::fmt::Debug for Session {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Session")
+            .field(
+                "secrets",
+                if self.is_encrypted() {
+                    &"(Hidden)"
+                } else {
+                    &"None"
+                },
+            )
+            .finish()
+    }
+}
+
+impl Session {
+    pub fn new(p: Proxy<'_, &'_ Connection>, encryption: EncryptionType) -> Result<Session, Error> {
+        use crate::proxy::service::Service;
+        match encryption {
+            EncryptionType::Plain => {
+                let bytes_arg = Box::new(String::new()) as Box<dyn RefArg>;
+                let (_, path) = p.open_session(ALGORITHM_PLAIN, Variant(bytes_arg))?;
+                Ok(Session {
+                    path,
+                    keypair: None,
+                    shared_key: None,
+                })
+            }
+            EncryptionType::Dh => {
+                // crypto: create private and public key
+                let keypair = Keypair::generate();
+
+                // send our public key with algorithm to service
+                let public_bytes = keypair.public.to_bytes_be();
+                let bytes_arg = Variant(Box::new(public_bytes) as Box<dyn RefArg>);
+                let (out, path) = p.open_session(ALGORITHM_DH, bytes_arg)?;
+
+                // get service public key back and create shared key from it
+                if let Some(server_public_key_bytes) = cast::<Vec<u8>>(&out.0) {
+                    let server_public_key = BigUint::from_bytes_be(server_public_key_bytes);
+                    let shared_key = keypair.derive_shared(&server_public_key);
+                    Ok(Session {
+                        path,
+                        keypair: Some(keypair),
+                        shared_key: Some(shared_key),
+                    })
+                } else {
+                    Err(Error::Parse)
+                }
+            }
+        }
+    }
+
+    pub fn is_encrypted(&self) -> bool {
+        !self.keypair.is_none()
+    }
+
+    pub(crate) fn encrypt_secret(&self, data: &[u8], mime: &str) -> EncryptedSecret {
+        if self.is_encrypted() {
+            // create the salt for the encryption
+            let mut aes_iv = [0; 16];
+            OsRng.fill(&mut aes_iv);
+            // encrypt the secret with the data
+            let encrypted = encrypt(data, &self.shared_key.unwrap(), &aes_iv);
+            EncryptedSecret {
+                path: self.path.clone(),
+                salt: aes_iv.to_vec(),
+                data: encrypted,
+                mime: mime.to_string(),
+            }
+        } else {
+            EncryptedSecret {
+                path: self.path.clone(),
+                salt: vec![],
+                data: data.to_vec(),
+                mime: mime.to_string(),
+            }
+        }
+    }
+
+    pub(crate) fn decrypt_secret(&self, secret: EncryptedSecret) -> Result<Vec<u8>, Error> {
+        if self.is_encrypted() {
+            let clear = decrypt(&secret.data, &self.shared_key.unwrap(), &secret.salt)?;
+            Ok(clear)
+        } else {
+            Ok(secret.data)
+        }
+    }
+}
+
 #[cfg(feature = "crypto-rust")]
-pub fn encrypt(data: &[u8], key: &AesKey, iv: &[u8]) -> Vec<u8> {
+fn encrypt(data: &[u8], key: &AesKey, iv: &[u8]) -> Vec<u8> {
     use aes::cipher::block_padding::Pkcs7;
+    use aes::cipher::generic_array::GenericArray;
     use aes::cipher::{BlockEncryptMut, KeyIvInit};
 
     type Aes128CbcEnc = cbc::Encryptor<aes::Aes128>;
 
+    let key = GenericArray::from_slice(key);
     let iv = GenericArray::from_slice(iv);
 
     Aes128CbcEnc::new(key, iv).encrypt_padded_vec_mut::<Pkcs7>(data)
 }
 
 #[cfg(feature = "crypto-rust")]
-pub fn decrypt(encrypted_data: &[u8], key: &AesKey, iv: &[u8]) -> Result<Vec<u8>, Error> {
+fn decrypt(encrypted_data: &[u8], key: &AesKey, iv: &[u8]) -> Result<Vec<u8>, Error> {
     use aes::cipher::block_padding::Pkcs7;
+    use aes::cipher::generic_array::GenericArray;
     use aes::cipher::{BlockDecryptMut, KeyIvInit};
 
     type Aes128CbcDec = cbc::Decryptor<aes::Aes128>;
 
+    let key = GenericArray::from_slice(key);
     let iv = GenericArray::from_slice(iv);
-    Aes128CbcDec::new(key, iv)
-        .decrypt_padded_vec_mut::<Pkcs7>(encrypted_data)
-        .map_err(|_| Error::Crypto("message decryption failed"))
+
+    let output = Aes128CbcDec::new(key, iv).decrypt_padded_vec_mut::<Pkcs7>(encrypted_data)?;
+    Ok(output)
 }
 
 #[cfg(feature = "crypto-openssl")]
@@ -290,10 +339,8 @@ pub fn decrypt(encrypted_data: &[u8], key: &AesKey, iv: &[u8]) -> Result<Vec<u8>
         .expect("cipher init should not fail");
 
     let mut output = vec![];
-    ctx.cipher_update_vec(encrypted_data, &mut output)
-        .map_err(|_| Error::Crypto("message decryption failed"))?;
-    ctx.cipher_final_vec(&mut output)
-        .map_err(|_| Error::Crypto("message decryption failed"))?;
+    ctx.cipher_update_vec(encrypted_data, &mut output)?;
+    ctx.cipher_final_vec(&mut output)?;
     Ok(output)
 }
 
@@ -309,23 +356,28 @@ pub fn decrypt(encrypted_data: &[u8], key: &AesKey, iv: &[u8]) -> Result<Vec<u8>
 
 #[cfg(test)]
 mod test {
+    use dbus::blocking::Connection;
+
+    use crate::proxy::new_proxy;
+    use crate::ss::SS_DBUS_PATH;
+
     use super::*;
 
     // There is no async test because this tests that an encryption session can be made, nothing more.
 
     #[test]
     fn should_create_plain_session() {
-        let conn = zbus::blocking::Connection::session().unwrap();
-        let service_proxy = ServiceProxyBlocking::new(&conn).unwrap();
-        let session = Session::new_blocking(&service_proxy, EncryptionType::Plain).unwrap();
-        assert!(session.get_aes_key().is_none());
+        let connection = Connection::new_session().unwrap();
+        let proxy = new_proxy(&connection, SS_DBUS_PATH);
+        let session = Session::new(proxy, EncryptionType::Plain).unwrap();
+        assert!(!session.is_encrypted());
     }
 
     #[test]
     fn should_create_encrypted_session() {
-        let conn = zbus::blocking::Connection::session().unwrap();
-        let service_proxy = ServiceProxyBlocking::new(&conn).unwrap();
-        let session = Session::new_blocking(&service_proxy, EncryptionType::Dh).unwrap();
-        assert!(session.get_aes_key().is_some());
+        let connection = Connection::new_session().unwrap();
+        let proxy = new_proxy(&connection, SS_DBUS_PATH);
+        let session = Session::new(proxy, EncryptionType::Dh).unwrap();
+        assert!(session.is_encrypted());
     }
 }

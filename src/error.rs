@@ -1,4 +1,4 @@
-// Copyright 2022 secret-service-rs Developers
+// Copyright 2016-2024 dbus-secret-service Contributors
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -6,20 +6,20 @@
 // copied, modified, or distributed except according to those terms.
 
 use std::{error, fmt};
-use zbus::zvariant;
 
 /// An error that could occur interacting with the secret service dbus interface.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {
-    /// An error occured decrypting a response message.
-    Crypto(&'static str),
+    /// An error occurred decrypting a response message.
+    /// The type of the error will depend on which crypto is being used.
+    Crypto(Box<dyn (error::Error) + Send>),
+    /// A bad path was handed to the secret service.
+    Path(String),
+    /// The response value of a secret service call couldn't be parsed.
+    Parse,
     /// A call into the secret service provider failed.
-    Zbus(zbus::Error),
-    /// A call into a standard dbus interface failed.
-    ZbusFdo(zbus::fdo::Error),
-    /// Serializing or deserializing a dbus message failed.
-    Zvariant(zvariant::Error),
+    Dbus(dbus::Error),
     /// A secret service interface was locked and can't return any
     /// information about its contents.
     Locked,
@@ -27,22 +27,25 @@ pub enum Error {
     NoResult,
     /// An authorization prompt was dismissed, but is required to continue.
     Prompt,
-    /// A secret service provider, or a session to connect to one, was found
-    /// on the system.
+    /// A secret service provider, or a session to connect to one,
+    /// was not found on the system.
     Unavailable,
+    /// The provided secret was not text/plain
+    UnsupportedSecretFormat,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::Crypto(err) => write!(f, "Crypto error: {err}"),
-            Error::Zbus(err) => write!(f, "zbus error: {err}"),
-            Error::ZbusFdo(err) => write!(f, "zbus fdo error: {err}"),
-            Error::Zvariant(err) => write!(f, "zbus serde error: {err}"),
-            Error::Locked => f.write_str("SS Error: object locked"),
-            Error::NoResult => f.write_str("SS error: result not returned from SS API"),
-            Error::Prompt => f.write_str("SS error: prompt dismissed"),
-            Error::Unavailable => f.write_str("no secret service provider or dbus session found"),
+            Error::Path(err) => write!(f, "DBus object path error: {err}"),
+            Error::Dbus(err) => write!(f, "DBus error: {err}"),
+            Error::Locked => f.write_str("Secret Service: object locked"),
+            Error::NoResult => f.write_str("Secret Service: no result found"),
+            Error::Prompt => f.write_str("Secret Service: unlock prompt was dismissed"),
+            Error::Unavailable => f.write_str("No DBus session or Secret Service provider found"),
+            Error::UnsupportedSecretFormat => f.write_str("Secrets must have MIME type text/plain"),
+            _ => write!(f, "Unexpected Error: {self:?}"),
         }
     }
 }
@@ -50,28 +53,42 @@ impl fmt::Display for Error {
 impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
-            Error::Zbus(ref err) => Some(err),
-            Error::ZbusFdo(ref err) => Some(err),
-            Error::Zvariant(ref err) => Some(err),
+            Error::Dbus(ref err) => Some(err),
             _ => None,
         }
     }
 }
 
-impl From<zbus::Error> for Error {
-    fn from(err: zbus::Error) -> Error {
-        Error::Zbus(err)
+impl From<dbus::Error> for Error {
+    fn from(err: dbus::Error) -> Error {
+        Error::Dbus(err)
     }
 }
 
-impl From<zbus::fdo::Error> for Error {
-    fn from(err: zbus::fdo::Error) -> Error {
-        Error::ZbusFdo(err)
+impl From<String> for Error {
+    // dbus parse errors return strings
+    fn from(s: String) -> Error {
+        Error::Path(s)
     }
 }
 
-impl From<zvariant::Error> for Error {
-    fn from(err: zvariant::Error) -> Error {
-        Error::Zvariant(err)
+#[cfg(feature = "crypto-rust")]
+impl From<aes::cipher::block_padding::UnpadError> for Error {
+    fn from(err: aes::cipher::block_padding::UnpadError) -> Error {
+        Error::Crypto(Box::new(err))
+    }
+}
+
+#[cfg(feature = "crypto-openssl")]
+impl From<openssl::error::ErrorStack> for Error {
+    fn from(err: openssl::error::ErrorStack) -> Error {
+        Error::Crypto(Box::new(err))
+    }
+}
+
+#[cfg(feature = "crypto-openssl")]
+impl From<openssl::error::Error> for Error {
+    fn from(err: openssl::error::Error) -> Error {
+        Error::Crypto(Box::new(err))
     }
 }
