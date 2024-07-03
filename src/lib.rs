@@ -5,9 +5,12 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
+#![allow(clippy::needless_doctest_main)]
+
 //! # Dbus-Based access to the Secret Service
 //!
 //! This library implements a rust wrapper that uses libdbus to access the Secret Service.
+//! Its use requires that a session `DBus` is available on the target machine.
 //!
 //! ## About the Secret Service
 //!
@@ -17,6 +20,7 @@
 //! Both the Gnome keyring and the KWallet implement the Secret Service API.
 //!
 //! ## Basic Usage
+//!
 //! ```
 //! use dbus_secret_service::SecretService;
 //! use dbus_secret_service::EncryptionType;
@@ -71,8 +75,9 @@
 //!
 //! ## Overview of this library:
 //! ### Entry point
-//! The entry point for this library is the `SecretService` struct. A new instance of
-//! `SecretService` will initialize the dbus connection and negotiate an encryption session.
+//! The entry point for this library is the [`SecretService`] struct. Creating an instance
+//! of this structure will initialize the dbus connection and create a session with the
+//! Secret Service.
 //!
 //! ```
 //! # use dbus_secret_service::SecretService;
@@ -81,13 +86,19 @@
 //! SecretService::connect(EncryptionType::Plain).unwrap();
 //! # }
 //! ```
+//! A session started with `EncryptionType::Plain` does not obscure the content
+//! of secrets in memory when sending them to and from the Secret Service.  These
+//! secrets _are_ encrypted by the Secret Service when put into its secure store.
 //!
-//! (If you have specified a crypto feature (`crypto-rust` or `crypto-openssl`),
-//! then you can use `EncryptionType:Dh` to force Diffie-Hellman encryption of the
-//! secret in memory when communicated between the client and the secret service.)
+//! If you have specified a crypto feature (`crypto-rust` or `crypto-openssl`),
+//! then you can use `EncryptionType:Dh` to force Diffie-Hellman shared key encryption
+//! of secrets in memory when they are being sent to and received from the Secret Service.
 //!
-//! Once the SecretService struct is initialized, it can be used to navigate to a collection.
-//! Items can also be directly searched for without getting a collection first.
+//! Once you have created a `SecretService` struct, you can use it to search for items,
+//! connect to the default collection of items, and to create new collections. The lifetimes
+//! of all the collection and item objects you retrieve from the service are tied to
+//! the service, so they cannot outlive the service instance. This restriction will
+//! be enforced by the Rust compiler.
 //!
 //! ### Collections and Items
 //! The Secret Service API organizes secrets into collections, and holds each secret
@@ -105,10 +116,6 @@
 //! each structure's documentation.
 //!
 //! In addition, `set` and `get` actions are available for secrets contained in an `Item`.
-//!
-//! ### Crypto
-//! Specifics in SecretService API Draft Proposal:
-//! <https://standards.freedesktop.org/secret-service/>
 //!
 
 use std::collections::HashMap;
@@ -135,19 +142,20 @@ mod proxy;
 mod session;
 mod ss;
 
-/// Secret Service Struct.
-///
-/// This the main entry point for usage of the library.
-///
-/// Creating a new [SecretService] will connect to the dbus
+/// Encapsulates a session connected to the Secret Service.
 pub struct SecretService {
     connection: Connection,
     session: Session,
     timeout: Option<u64>,
 }
 
-/// Used to indicate locked and unlocked items in the
-/// return value of [SecretService::search_items].
+/// Represents the results of doing a service-wide search.
+///
+/// The returned items are organized in two vectors: one
+/// holds unlocked items and the other holds locked items.
+/// (Reading or writing the secret of a locked item requires
+/// prompting the user interactively for permission.  This
+/// prompting is done by the Secret Service itself.)
 pub struct SearchItemsResult<T> {
     pub unlocked: Vec<T>,
     pub locked: Vec<T>,
@@ -161,10 +169,10 @@ pub(crate) enum LockAction {
 impl SecretService {
     /// Connect to the DBus and return a new [SecretService] instance.
     ///
-    /// If one of the crypto features is enabled, then you can specify that
-    /// you want communication of secrets to and from the dbus to be encrypted
-    /// so that they don't appear in cleartext in memory where other processes
-    /// might intercept them.
+    /// If this service instance needs to prompt a user for permission to
+    /// access a locked item or collection, it will block indefinitely waiting for
+    /// the user's response  See [connect_with_timeout] if you want
+    /// different behavior.
     pub fn connect(encryption: EncryptionType) -> Result<Self, Error> {
         let connection = Connection::new_session()?;
         let session = Session::new(new_proxy(&connection, SS_DBUS_PATH), encryption)?;
@@ -177,10 +185,12 @@ impl SecretService {
 
     /// Connect to the DBus and return a new [SecretService] instance.
     ///
-    /// Instead of waiting indefinitely for users to respond to prompts,
-    /// this instance will time them out after the given number of seconds.
+    /// If this service instance needs to prompt a user for permission to
+    /// access a locked item or collection,
+    /// it will only block for the given number of seconds,
+    /// after which it will dismiss the prompt and cancel the operation.
     /// (Specifying 0 for the number of seconds will prevent the prompt
-    /// from appearing at all: it will always time out.)
+    /// from appearing at all: the operation will immediately be cancelled.)
     pub fn connect_with_max_prompt_timeout(
         encryption: EncryptionType,
         seconds: u64,
@@ -191,7 +201,7 @@ impl SecretService {
     }
 
     /// Get the service proxy (internal)
-    fn proxy<'a>(&'a self) -> Proxy<'a, &'a Connection> {
+    fn proxy(&self) -> Proxy<'_, &Connection> {
         new_proxy(&self.connection, SS_DBUS_PATH)
     }
 

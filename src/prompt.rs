@@ -32,6 +32,7 @@ impl SecretService {
         handler: fn(PromptCompleted) -> Result<T, Error>,
     ) -> Result<T, Error> {
         // set up handler
+        #[allow(clippy::type_complexity)]
         let (tx, rx): (Sender<Result<T, Error>>, Receiver<Result<T, Error>>) = channel();
         let internal_handler = move |signal: PromptCompleted, _: &Connection, _: &Message| {
             tx.send(handler(signal)).unwrap();

@@ -19,6 +19,11 @@ use crate::{
     LockAction, SecretService,
 };
 
+/// Represents a Secret Service item that has key/value attributes and a secret.
+///
+/// Item lifetimes are tied to the [`SecretService`] instance they were retrieved
+/// from or created by (whether directly or via a [`crate::Collection`] object), and they
+/// cannot outlive that instance.
 pub struct Item<'a> {
     service: &'a SecretService,
     pub(crate) path: Path<'static>,

@@ -106,6 +106,7 @@ impl<'a, T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Collecti
     for blocking::Proxy<'a, C>
 {
     fn delete(&self) -> Result<dbus::Path<'static>, dbus::Error> {
+        #![allow(clippy::bind_instead_of_map)]
         self.method_call("org.freedesktop.Secret.Collection", "Delete", ())
             .and_then(|r: (dbus::Path<'static>,)| Ok(r.0))
     }
@@ -114,6 +115,7 @@ impl<'a, T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Collecti
         &self,
         attributes: ::std::collections::HashMap<&str, &str>,
     ) -> Result<Vec<dbus::Path<'static>>, dbus::Error> {
+        #![allow(clippy::bind_instead_of_map)]
         self.method_call(
             "org.freedesktop.Secret.Collection",
             "SearchItems",
