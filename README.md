@@ -1,5 +1,10 @@
 # dbus-secret-service
 
+[![build](https://github.com/brotskydotcom/dbus-secret-service/actions/workflows/ci.yaml/badge.svg)](https://github.com/brotskydotcom/dbus-secret-service/actions)
+[![dependencies](https://deps.rs/repo/github/brotskydotcom/dbus-secret-service/status.svg)](https://github.com/brotskydotcom/dbus-secret-service)
+[![crates.io](https://img.shields.io/crates/v/dbus-secret-service.svg?style=flat-square)](https://crates.io/crates/dbus-secret-service)
+[![docs.rs](https://docs.rs/dbus-secret-service/badge.svg)](https://docs.rs/dbus-secret-service)
+
 This crate is a knock-off of the
 [hwchen/secret-service](https://crates.io/crates/secret-service)
 crate, which is currently at version 4
@@ -36,7 +41,7 @@ search your package manager for `dbus`.
 For dependency info, see this crate on
 [crates.io](https://crates.io/crates/dbus-secret-service).
 For code usage examples, see the
-[documentation](https://docs.rs/crate/dbus-secret-service).
+[documentation](https://docs.rs/dbus-secret-service).
 
 This crate has no default features, and requires
 no features to run. If you need your secrets
@@ -47,7 +52,7 @@ secret service, then add one of the crypto features:
 * `crypto-openssl` uses the openssl libraries for encryption (which must be installed).
 
 See the
-[documentation](https://docs.rs/crate/dbus-secret-service)
+[documentation](https://docs.rs/dbus-secret-service)
 for details on how to specify use of an encrypted session.
 
 Note: To build a project that uses this crate, your development machine

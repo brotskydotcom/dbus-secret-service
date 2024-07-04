@@ -5,8 +5,6 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-//
-
 // key exchange and crypto for session:
 // 1. Before session negotiation (openSession), set private key and public key using DH method.
 // 2. In session negotiation, send public key.
