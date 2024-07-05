@@ -19,6 +19,11 @@ use crate::{
     LockAction, SecretService,
 };
 
+/// Represents a Secret Service item that has key/value attributes and a secret.
+///
+/// Item lifetimes are tied to the [`SecretService`] instance they were retrieved
+/// from or created by (whether directly or via a [`crate::Collection`] object), and they
+/// cannot outlive that instance.
 pub struct Item<'a> {
     service: &'a SecretService,
     pub(crate) path: Path<'static>,
@@ -253,6 +258,7 @@ mod test {
         assert_eq!(secret, b"test");
     }
 
+    #[cfg(any(feature = "crypto-rust", feature = "crypto-openssl"))]
     #[test]
     fn should_create_and_get_secret_encrypted() {
         let ss = SecretService::connect(EncryptionType::Dh).unwrap();
@@ -287,6 +293,7 @@ mod test {
         assert_eq!(secret, b"new_test");
     }
 
+    #[cfg(any(feature = "crypto-rust", feature = "crypto-openssl"))]
     #[test]
     fn should_create_encrypted_item() {
         let ss = SecretService::connect(EncryptionType::Dh).unwrap();
@@ -305,6 +312,7 @@ mod test {
         assert_eq!(secret, b"test_encrypted");
     }
 
+    #[cfg(any(feature = "crypto-rust", feature = "crypto-openssl"))]
     #[test]
     fn should_create_encrypted_item_from_empty_secret() {
         //empty string
@@ -318,6 +326,7 @@ mod test {
         assert_eq!(secret, b"");
     }
 
+    #[cfg(any(feature = "crypto-rust", feature = "crypto-openssl"))]
     #[test]
     fn should_get_encrypted_secret_across_dbus_connections() {
         {

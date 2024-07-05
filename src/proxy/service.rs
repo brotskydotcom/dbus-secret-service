@@ -47,6 +47,7 @@ pub trait Service {
     ) -> Result<(Vec<dbus::Path<'static>>, dbus::Path<'static>), dbus::Error>;
     fn lock_service(&self) -> Result<(), dbus::Error>;
     fn change_lock(&self, collection: dbus::Path) -> Result<dbus::Path<'static>, dbus::Error>;
+    #[allow(clippy::type_complexity)]
     fn get_secrets(
         &self,
         items: Vec<dbus::Path>,
@@ -198,6 +199,7 @@ impl<'a, T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Service
     }
 
     fn change_lock(&self, collection: dbus::Path) -> Result<dbus::Path<'static>, dbus::Error> {
+        #![allow(clippy::bind_instead_of_map)]
         self.method_call(
             "org.freedesktop.Secret.Service",
             "ChangeLock",
@@ -206,6 +208,7 @@ impl<'a, T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Service
         .and_then(|r: (dbus::Path<'static>,)| Ok(r.0))
     }
 
+    #[allow(clippy::type_complexity)]
     fn get_secrets(
         &self,
         items: Vec<dbus::Path>,
@@ -217,6 +220,7 @@ impl<'a, T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Service
         >,
         dbus::Error,
     > {
+        #![allow(clippy::bind_instead_of_map)]
         self.method_call(
             "org.freedesktop.Secret.Service",
             "GetSecrets",
@@ -233,6 +237,7 @@ impl<'a, T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Service
     }
 
     fn read_alias(&self, name: &str) -> Result<dbus::Path<'static>, dbus::Error> {
+        #![allow(clippy::bind_instead_of_map)]
         self.method_call("org.freedesktop.Secret.Service", "ReadAlias", (name,))
             .and_then(|r: (dbus::Path<'static>,)| Ok(r.0))
     }

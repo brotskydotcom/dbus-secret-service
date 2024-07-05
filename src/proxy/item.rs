@@ -41,6 +41,7 @@ impl<'a, T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Item
     for blocking::Proxy<'a, C>
 {
     fn delete(&self) -> Result<dbus::Path<'static>, dbus::Error> {
+        #![allow(clippy::bind_instead_of_map)]
         self.method_call("org.freedesktop.Secret.Item", "Delete", ())
             .and_then(|r: (dbus::Path<'static>,)| Ok(r.0))
     }
@@ -49,6 +50,7 @@ impl<'a, T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Item
         &self,
         session: dbus::Path,
     ) -> Result<(dbus::Path<'static>, Vec<u8>, Vec<u8>, String), dbus::Error> {
+        #![allow(clippy::bind_instead_of_map)]
         self.method_call("org.freedesktop.Secret.Item", "GetSecret", (session,))
             .and_then(|r: ((dbus::Path<'static>, Vec<u8>, Vec<u8>, String),)| Ok(r.0))
     }

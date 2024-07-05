@@ -3,50 +3,14 @@ permissions:
   contents: read
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
-    branches:
-    - master
 
 env:
   CARGO_NET_RETRY: 3
 
 jobs:
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        rust:
-          - stable
-        feature:
-          - rt-async-io-crypto-rust
-          - rt-async-io-crypto-openssl
-          - rt-tokio-crypto-rust
-          - rt-tokio-crypto-openssl
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-    
-    - uses: actions-rust-lang/setup-rust-toolchain@v1
-      with:
-        toolchain: ${{ matrix.rust }}
-        components: clippy
-
-    - uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: $clippy-cache-${{ steps.toolchain.outputs.rustc_hash }}-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: "Clippy ${{ matrix.rust }}"
-      run: cargo clippy --features=${{ matrix.feature }} --all-targets --all -- -D clippy::dbg_macro -D warnings -F unused_must_use
-
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
@@ -64,6 +28,45 @@ jobs:
       - name: "Check formatting"
         run: cargo fmt --all -- --check
 
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        rust:
+          - stable
+        feature:
+          - ""
+          - crypto-rust
+          - crypto-openssl
+
+    steps:
+      - name: install required packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev libssl-dev
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          components: clippy
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: $clippy-cache-${{ steps.toolchain.outputs.rustc_hash }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: "Clippy ${{ matrix.rust }}"
+        run: cargo clippy --features=${{ matrix.feature }} --all-targets --workspace -- -D warnings
+
   test:
     name: Tests
     runs-on: ubuntu-latest
@@ -73,12 +76,16 @@ jobs:
         rust:
           - stable
         feature:
-          - rt-async-io-crypto-rust
-          - rt-async-io-crypto-openssl
-          - rt-tokio-crypto-rust
-          - rt-tokio-crypto-openssl
+          - ""
+          - crypto-rust
+          - crypto-openssl
 
     steps:
+      - name: install required packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev libssl-dev
+
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -111,20 +118,24 @@ jobs:
       - name: Run example
         run: cargo run --features=${{ matrix.feature }} --example example
 
-  # MSRV, influenced by zbus.
+  # MSRV, taken from matching secret-service.
   check_msrv:
     name: Check MSRV
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-       feature:
-         - rt-async-io-crypto-rust
-         - rt-async-io-crypto-openssl
-         - rt-tokio-crypto-rust
-         - rt-tokio-crypto-openssl
+        feature:
+          - ""
+          - crypto-rust
+          - crypto-openssl
 
     steps:
+      - name: install required packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev libssl-dev
+
       - uses: actions/checkout@v4
         with:
           persist-credentials: false

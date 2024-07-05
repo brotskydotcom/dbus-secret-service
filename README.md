@@ -1,5 +1,10 @@
 # dbus-secret-service
 
+[![build](https://github.com/brotskydotcom/dbus-secret-service/actions/workflows/ci.yaml/badge.svg)](https://github.com/brotskydotcom/dbus-secret-service/actions)
+[![dependencies](https://deps.rs/repo/github/brotskydotcom/dbus-secret-service/status.svg)](https://github.com/brotskydotcom/dbus-secret-service)
+[![crates.io](https://img.shields.io/crates/v/dbus-secret-service.svg?style=flat-square)](https://crates.io/crates/dbus-secret-service)
+[![docs.rs](https://docs.rs/dbus-secret-service/badge.svg)](https://docs.rs/dbus-secret-service)
+
 This crate is a knock-off of the
 [hwchen/secret-service](https://crates.io/crates/secret-service)
 crate, which is currently at version 4
@@ -9,6 +14,7 @@ to access the secret service. The basic
 collection, item and search APIs in this
 crate are meant to work the same as the
 blocking APIs in the zbus-based crate.
+If they don't, please file a bug.
 
 Why do a knock-off? So that folks who write
 synchronous Rust apps that access the secret
@@ -19,12 +25,12 @@ runtime. Because this knock-off uses lib-dbus,
 it doesn't require an async runtime.
 
 Why is this crate starting at version 4?
-Since it's API is sync'd to a particular
+Since its API matches a particular
 version of the dbus-based crate, I figured
-it would be clearest if it's version
-number was sync'd as well.
+it would be clearest if its version
+number was matched that version as well.
 
-### Basic Usage
+## Usage
 
 Just in case it wasn't clear from the above,
 in order to use this crate on a given machine,
@@ -32,52 +38,27 @@ you will need to have `libdbus` installed.
 Most do, but if yours doesn't then
 search your package manager for `dbus`.
 
-In `Cargo.toml`:
+For dependency info, see this crate on
+[crates.io](https://crates.io/crates/dbus-secret-service).
+For code usage examples, see the
+[documentation](https://docs.rs/dbus-secret-service).
 
-```
-[dependencies]
-dbus-secret-service = "4"
-```
+This crate has no default features, and requires
+no features to run. If you need your secrets
+to be encrypted on their way to and from the
+secret service, then add one of the crypto features:
 
-In source code (below example is for --bin, not --lib)
+* `crypto-rust` uses pure Rust crates for encryption.
+* `crypto-openssl` uses the openssl libraries for encryption (which must be installed).
 
-```rust
-use secret_service::SecretService;
-use secret_service::EncryptionType;
-use std::error::Error;
+See the
+[documentation](https://docs.rs/dbus-secret-service)
+for details on how to specify use of an encrypted session.
 
-fn main() -> Result<(), Box<Error>> {
-
-    // initialize secret service (dbus connection and encryption session)
-    let ss = SecretService::new(EncryptionType::Dh)?;
-
-    // get default collection
-    let collection = ss.get_default_collection()?;
-
-    //create new item
-    collection.create_item(
-        "test_label", // label
-        vec![("test", "test_value")], // properties
-        b"test_secret", //secret
-        false, // replace item with same attributes
-        "text/plain" // secret content type
-    )?;
-
-    // search items by properties
-    let search_items = ss.search_items(
-        vec![("test", "test_value")]
-    )?;
-
-    let item = search_items.get(0)?;
-
-    // retrieve secret from item
-    let secret = item.get_secret()?;
-    assert_eq!(secret, b"test_secret");
-
-    // delete item (deletes the dbus object, not the struct instance)
-    item.delete()?;
-}
-```
+Note: To build a project that uses this crate, your development machine
+will need to have the dbus development headers installed. If your project
+uses the `crypto-openssl` feature, you will also need to have the openssl
+development headers installed.
 
 ### Functionality
 
@@ -85,11 +66,9 @@ fn main() -> Result<(), Box<Error>> {
 - Collections: create, delete, search.
 - Items: create, delete, search, get/set secret.
 
-### Changelog
+## Changelog
 
 v4.0.0: first release, same API as secret-service v4.0.
-Only functional difference is that we don't support
-secret types other than `text/plain`.
 
 ## License
 
@@ -104,7 +83,7 @@ All material is this repository is licensed under either of
 
 at your option.
 
-### Contribution
+## Contribution
 
 Unless you explicitly state otherwise,
 any contribution intentionally submitted

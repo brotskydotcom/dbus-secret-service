@@ -20,9 +20,10 @@ use crate::{
     Error, Item, LockAction, SecretService,
 };
 
-// Collection struct.
-// Should always be created from the SecretService entry point,
-// whether through a new collection or a collection search
+/// Represents a Secret Service collection of items.
+///
+/// Collections are retrieved from and created by a
+/// [`SecretService`] instance and cannot outlive it.
 pub struct Collection<'a> {
     service: &'a SecretService,
     pub(crate) path: Path<'static>,
