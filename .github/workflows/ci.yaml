@@ -65,7 +65,7 @@ jobs:
           key: $clippy-cache-${{ steps.toolchain.outputs.rustc_hash }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: "Clippy ${{ matrix.rust }}"
-        run: cargo clippy --features=${{ matrix.feature }} --all-targets --workspace -- -D clippy::dbg_macro -D warnings -F unused_must_use
+        run: cargo clippy --features=${{ matrix.feature }} --all-targets --workspace -- -D warnings
 
   test:
     name: Tests

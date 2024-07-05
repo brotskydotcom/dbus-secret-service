@@ -73,8 +73,6 @@ pub struct Session {
     pub(crate) path: Path<'static>,
     encryption: EncryptionType,
     #[cfg(any(feature = "crypto-rust", feature = "crypto-openssl"))]
-    keypair: Option<crypto::Keypair>,
-    #[cfg(any(feature = "crypto-rust", feature = "crypto-openssl"))]
     shared_key: Option<crypto::AesKey>,
 }
 
@@ -106,8 +104,6 @@ impl Session {
                     path,
                     encryption,
                     #[cfg(any(feature = "crypto-rust", feature = "crypto-openssl"))]
-                    keypair: None,
-                    #[cfg(any(feature = "crypto-rust", feature = "crypto-openssl"))]
                     shared_key: None,
                 })
             }
@@ -130,8 +126,6 @@ impl Session {
                     Ok(Session {
                         path,
                         encryption,
-                        #[cfg(any(feature = "crypto-rust", feature = "crypto-openssl"))]
-                        keypair: Some(keypair),
                         #[cfg(any(feature = "crypto-rust", feature = "crypto-openssl"))]
                         shared_key: Some(shared_key),
                     })
@@ -240,12 +234,16 @@ mod crypto {
     }
 
     #[cfg(all(feature = "crypto-openssl", not(feature = "crypto-rust")))]
-    pub(super) fn encrypt(data: &[u8], key: &AesKey, iv: &[u8]) -> Vec<u8> {
+    pub(super) fn encrypt(data: &[u8], key: &AesKey) -> (Vec<u8>, Vec<u8>) {
         use openssl::cipher::Cipher;
         use openssl::cipher_ctx::CipherCtx;
 
+        // create the salt for the encryption
+        let mut aes_iv = [0u8; 16];
+        OsRng.fill(&mut aes_iv);
+
         let mut ctx = CipherCtx::new().expect("cipher creation should not fail");
-        ctx.encrypt_init(Some(Cipher::aes_128_cbc()), Some(key), Some(iv))
+        ctx.encrypt_init(Some(Cipher::aes_128_cbc()), Some(key), Some(&aes_iv))
             .expect("cipher init should not fail");
 
         let mut output = vec![];
@@ -253,7 +251,7 @@ mod crypto {
             .expect("cipher update should not fail");
         ctx.cipher_final_vec(&mut output)
             .expect("cipher final should not fail");
-        output
+        (output, aes_iv.to_vec())
     }
 
     #[cfg(all(feature = "crypto-openssl", not(feature = "crypto-rust")))]
