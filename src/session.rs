@@ -98,6 +98,9 @@ impl Session {
         match encryption {
             EncryptionType::Plain => {
                 use crate::ss::ALGORITHM_PLAIN;
+                // in rust 1.70, this lint applies here even though it shouldn't
+                // because we need an explicit string to interpret as a RefArg
+                #[allow(clippy::box_default)]
                 let bytes_arg = Box::new(String::new()) as Box<dyn RefArg>;
                 let (_, path) = p.open_session(ALGORITHM_PLAIN, Variant(bytes_arg))?;
                 Ok(Session {
