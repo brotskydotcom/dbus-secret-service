@@ -19,9 +19,6 @@ it would be clearest if its version number matched that version as well.
 
 ## Usage
 
-Just in case it wasn't clear from the above, in order to use this crate on a given machine, you will need to
-have `libdbus` installed. Most do, but if yours doesn't then search your package manager for `dbus`.
-
 For code usage examples, see the [documentation](https://docs.rs/dbus-secret-service).
 
 This crate has no default features, and requires no features to run. If you need your secrets to be encrypted on their
@@ -32,9 +29,16 @@ way to and from the secret service, then add one of the crypto features:
 
 See the [documentation](https://docs.rs/dbus-secret-service) for details on how to specify use of an encrypted session.
 
-Note: To build a project that uses this crate, your development machine will need to have the dbus development headers
-installed. If your project uses the `crypto-openssl` feature, you will also need to have the openssl development headers
-installed.
+To _build_ a project that uses this crate, your development machine will need
+to have the dbus development headers installed,
+and the openssl development headers for the `crypto-openssl` feature.
+To _run_ an application that uses this crate,
+your machine will need to have `libdbus` installed
+(almost all do),
+and the openssl libraries for the `crypto-openssl` feature.
+If you want to avoid this runtime requirement,
+you can specify the `vendored` feature at build time:
+this will statically link the needed libraries with your executable.
 
 ### Functionality
 
@@ -48,8 +52,8 @@ v4.0.0: first release, same API as secret-service v4.0.
 
 ## License
 
-The copyright to all material in this repository belongs to the collective of contributors who have checked material in
-to this repository.
+The copyright to all material in this repository belongs to the collective
+of contributors who have checked material into this repository.
 
 All material is this repository is licensed under either of
 
@@ -60,5 +64,8 @@ at your option.
 
 ## Contribution
 
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as
-defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+Unless you explicitly state otherwise,
+any contribution intentionally submitted for inclusion in the work by you,
+as defined in the Apache-2.0 license,
+shall be dual licensed as above,
+without any additional terms or conditions.

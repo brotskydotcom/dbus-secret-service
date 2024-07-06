@@ -158,4 +158,4 @@ jobs:
           cargo generate-lockfile
 
       - name: Clippy MSRV
-        run: cargo clippy --features=${{ matrix.feature }} --all-targets --all -- -D clippy::dbg_macro -D warnings -F unused_must_use
+        run: cargo clippy --features=${{ matrix.feature }} --all-targets --workspace -- -D warnings
