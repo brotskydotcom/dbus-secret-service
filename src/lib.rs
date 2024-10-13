@@ -74,6 +74,7 @@
 //! ```
 //!
 //! ## Overview of this library:
+//!
 //! ### Entry point
 //! The entry point for this library is the [`SecretService`] struct. Creating an instance
 //! of this structure will initialize the dbus connection and create a session with the
@@ -117,7 +118,32 @@
 //!
 //! In addition, `set` and `get` actions are available for secrets contained in an `Item`.
 //!
-
+//! ## Headless usage
+//!
+//! If you must use the secret-service on a headless linux box,
+//! be aware that there are known issues with getting
+//! dbus and secret-service and the gnome keyring
+//! to work properly in headless environments.
+//! For a quick workaround, look at how this project's
+//! [CI workflow](https://github.com/hwchen/keyring-rs/blob/master/.github/workflows/ci.yaml)
+//! starts the Gnome keyring unlocked with a known password;
+//! a similar solution is also documented in the
+//! [Python Keyring docs](https://pypi.org/project/keyring/)
+//! (search for "Using Keyring on headless Linux systems").
+//! The following `bash` function may be helpful:
+//!
+//! ```shell
+//! function unlock-keyring ()
+//! {
+//! read -rsp "Password: " pass
+//! echo -n "$pass" | gnome-keyring-daemon --unlock
+//! unset pass
+//! }
+//! ```
+//!
+//! For an excellent treatment of all the headless dbus issues, see
+//! [this answer on ServerFault](https://serverfault.com/a/906224/79617).
+//!
 use std::collections::HashMap;
 
 pub use collection::Collection;
