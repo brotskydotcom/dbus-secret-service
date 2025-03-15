@@ -14,20 +14,20 @@ exclude = [".github/"]
 
 [features]
 vendored = ["dbus/vendored", "openssl?/vendored"]
-crypto-rust = ["dep:aes", "dep:block-padding", "dep:cbc", "dep:sha2", "dep:hkdf", "dep:rand"]
-crypto-openssl = ["dep:openssl", "dep:rand"]
+crypto-rust = ["dep:aes", "dep:block-padding", "dep:cbc", "dep:fastrand", "dep:hkdf", "dep:sha2"]
+crypto-openssl = ["dep:fastrand", "dep:openssl"]
 
 [dependencies]
 aes = { version = "0.8", optional = true }
 block-padding = { version = "0.3", features = ["std"], optional = true }
 cbc = { version = "0.1", features = ["block-padding", "alloc"], optional = true }
 dbus = "0.9"
+fastrand = { version = "2.3", optional = true }
 futures-util = "0.3"
 hkdf = { version = "0.12", optional = true }
 num = "0.4"
 once_cell = "1"
 openssl = { version = "0.10.55", optional = true }
-rand = { version = "0.9", optional = true }
 sha2 = { version = "0.10", optional = true }
 
 [dev-dependencies]

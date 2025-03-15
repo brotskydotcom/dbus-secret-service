@@ -185,6 +185,7 @@ impl Session {
 mod crypto {
     use std::ops::{Mul, Rem, Shr};
 
+    use fastrand::Rng;
     use num::{
         bigint::BigUint,
         integer::Integer,
@@ -192,7 +193,6 @@ mod crypto {
         FromPrimitive,
     };
     use once_cell::sync::Lazy;
-    use rand::{rngs::OsRng, Rng};
 
     #[cfg(feature = "crypto-rust")]
     pub(super) fn encrypt(data: &[u8], key: &AesKey) -> (Vec<u8>, Vec<u8>) {
@@ -203,8 +203,7 @@ mod crypto {
         type Aes128CbcEnc = cbc::Encryptor<aes::Aes128>;
 
         // create the salt for the encryption
-        let mut aes_iv = [0; 16];
-        OsRng.fill(&mut aes_iv);
+        let mut aes_iv = salt();
 
         // convert key and salt to input parameter form
         let key = GenericArray::from_slice(key);
@@ -242,8 +241,7 @@ mod crypto {
         use openssl::cipher_ctx::CipherCtx;
 
         // create the salt for the encryption
-        let mut aes_iv = [0u8; 16];
-        OsRng.fill(&mut aes_iv);
+        let mut aes_iv = salt();
 
         let mut ctx = CipherCtx::new().expect("cipher creation should not fail");
         ctx.encrypt_init(Some(Cipher::aes_128_cbc()), Some(key), Some(&aes_iv))
@@ -276,6 +274,13 @@ mod crypto {
         Ok(output)
     }
 
+    fn salt() -> [u8; 16] {
+        let mut rng = Rng::new();
+        let mut salt = [0; 16];
+        rng.fill(&mut salt);
+        salt
+    }
+
     // for key exchange
     static DH_GENERATOR: Lazy<BigUint> = Lazy::new(|| BigUint::from_u64(0x2).unwrap());
     static DH_PRIME: Lazy<BigUint> = Lazy::new(|| {
@@ -303,7 +308,7 @@ mod crypto {
 
     impl Keypair {
         pub(super) fn generate() -> Self {
-            let mut rng = OsRng {};
+            let mut rng = Rng::new();
             let mut private_key_bytes = [0; 128];
             rng.fill(&mut private_key_bytes);
 
