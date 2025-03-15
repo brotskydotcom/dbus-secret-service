@@ -203,7 +203,7 @@ mod crypto {
         type Aes128CbcEnc = cbc::Encryptor<aes::Aes128>;
 
         // create the salt for the encryption
-        let mut aes_iv = salt();
+        let aes_iv = salt();
 
         // convert key and salt to input parameter form
         let key = GenericArray::from_slice(key);
@@ -241,7 +241,7 @@ mod crypto {
         use openssl::cipher_ctx::CipherCtx;
 
         // create the salt for the encryption
-        let mut aes_iv = salt();
+        let aes_iv = salt();
 
         let mut ctx = CipherCtx::new().expect("cipher creation should not fail");
         ctx.encrypt_init(Some(Cipher::aes_128_cbc()), Some(key), Some(&aes_iv))
