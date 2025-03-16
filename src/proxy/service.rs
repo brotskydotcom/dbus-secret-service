@@ -136,8 +136,8 @@ impl dbus::message::SignalArgs for ServiceCollectionChanged {
     const INTERFACE: &'static str = "org.freedesktop.Secret.Service";
 }
 
-impl<'a, T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Service
-    for blocking::Proxy<'a, C>
+impl<T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Service
+    for blocking::Proxy<'_, C>
 {
     fn open_session(
         &self,

@@ -48,8 +48,8 @@ impl dbus::message::SignalArgs for PromptCompleted {
     const INTERFACE: &'static str = "org.freedesktop.Secret.Prompt";
 }
 
-impl<'a, T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Prompt
-    for blocking::Proxy<'a, C>
+impl<T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Prompt
+    for blocking::Proxy<'_, C>
 {
     fn prompt(&self, window_id: &str) -> Result<(), dbus::Error> {
         self.method_call("org.freedesktop.Secret.Prompt", "Prompt", (window_id,))

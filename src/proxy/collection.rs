@@ -102,8 +102,8 @@ impl dbus::message::SignalArgs for CollectionItemChanged {
     const INTERFACE: &'static str = "org.freedesktop.Secret.Collection";
 }
 
-impl<'a, T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Collection
-    for blocking::Proxy<'a, C>
+impl<T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Collection
+    for blocking::Proxy<'_, C>
 {
     fn delete(&self) -> Result<dbus::Path<'static>, dbus::Error> {
         #![allow(clippy::bind_instead_of_map)]

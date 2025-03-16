@@ -37,8 +37,8 @@ pub trait Item {
     fn modified(&self) -> Result<u64, dbus::Error>;
 }
 
-impl<'a, T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Item
-    for blocking::Proxy<'a, C>
+impl<T: blocking::BlockingSender, C: ::std::ops::Deref<Target = T>> Item
+    for blocking::Proxy<'_, C>
 {
     fn delete(&self) -> Result<dbus::Path<'static>, dbus::Error> {
         #![allow(clippy::bind_instead_of_map)]
