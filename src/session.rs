@@ -19,6 +19,7 @@ use dbus::{
     blocking::{Connection, Proxy},
     Path,
 };
+use zeroize::ZeroizeOnDrop;
 
 use crate::Error;
 
@@ -42,8 +43,10 @@ pub enum EncryptionType {
     Dh,
 }
 
+#[derive(ZeroizeOnDrop)]
 pub(crate) struct EncryptedSecret {
-    path: Path<'static>,     // the session path
+    #[zeroize(skip)]
+    path: Path<'static>, // the session path
     salt: Vec<u8>,           // the salt for the encrypted data
     data: Vec<u8>,           // the encrypted data
     pub(crate) mime: String, // the mime type of the decrypted data
@@ -69,8 +72,11 @@ impl EncryptedSecret {
     }
 }
 
+#[derive(ZeroizeOnDrop)]
 pub struct Session {
+    #[zeroize(skip)]
     pub(crate) path: Path<'static>,
+    #[zeroize(skip)]
     encryption: EncryptionType,
     #[cfg(any(feature = "crypto-rust", feature = "crypto-openssl"))]
     shared_key: Option<crypto::AesKey>,
@@ -171,7 +177,7 @@ impl Session {
 
     pub(crate) fn decrypt_secret(&self, secret: EncryptedSecret) -> Result<Vec<u8>, Error> {
         match self.encryption {
-            EncryptionType::Plain => Ok(secret.data),
+            EncryptionType::Plain => Ok(secret.data.clone()),
             #[cfg(any(feature = "crypto-rust", feature = "crypto-openssl"))]
             EncryptionType::Dh => {
                 let clear = crypto::decrypt(&secret.data, &self.shared_key.unwrap(), &secret.salt)?;
