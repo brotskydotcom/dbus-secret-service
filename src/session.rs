@@ -14,13 +14,14 @@
 // 6. Format Secret: encode the secret value for the value field in secret struct.
 //      This encoding uses the aes_key from the associated Session.
 
-use crate::Error;
 use dbus::{
     arg::{RefArg, Variant},
     blocking::{Connection, Proxy},
     Path,
 };
 use zeroize::ZeroizeOnDrop;
+
+use crate::Error;
 
 #[cfg(all(feature = "crypto-rust", feature = "crypto-openssl"))]
 compile_error!("You cannot specify both feature \"crypto-rust\" and feature \"crypto-openssl\"");
