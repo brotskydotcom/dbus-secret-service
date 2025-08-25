@@ -26,15 +26,15 @@ use crate::{
 /// cannot outlive that instance.
 pub struct Item<'a> {
     service: &'a SecretService,
-    pub(crate) path: Path<'static>,
+    pub path: Path<'static>,
 }
 
 impl<'a> Item<'a> {
-    pub(crate) fn new(service: &'a SecretService, path: Path<'static>) -> Item<'a> {
+    pub fn new(service: &'a SecretService, path: Path<'static>) -> Item<'a> {
         Item { service, path }
     }
 
-    fn proxy(&self) -> Proxy<&Connection> {
+    fn proxy(&'_ self) -> Proxy<'_, &'_ Connection> {
         new_proxy(&self.service.connection, &self.path)
     }
 
@@ -83,7 +83,7 @@ impl<'a> Item<'a> {
     /// Delete the underlying dbus item
     pub fn delete(&self) -> Result<(), Error> {
         let p_path = self.proxy().delete()?;
-        if p_path != Path::new("/").unwrap() {
+        if p_path != Path::new("/")? {
             self.service.prompt_for_lock_unlock_delete(&p_path)
         } else {
             Ok(())
@@ -141,7 +141,7 @@ mod test {
         let item = create_test_default_item(&collection);
 
         item.delete().unwrap();
-        // Random operation to prove that path no longer exists
+        // Random operation to prove that item no longer exists
         if item.get_label().is_ok() {
             panic!("item still existed");
         }
@@ -199,7 +199,7 @@ mod test {
         let attributes = item.get_attributes().unwrap();
 
         // We do not compare exact attributes, since the secret service provider could add its own
-        // at any time. Instead, we only check that the ones we provided are returned back.
+        // at any time. Instead, we only check that the ones we provided are returned.
         assert_eq!(
             attributes
                 .get("test_attributes_in_item")
@@ -224,7 +224,7 @@ mod test {
         let attributes = item.get_attributes().unwrap();
 
         // We do not compare exact attributes, since the secret service provider could add its own
-        // at any time. Instead, we only check that the ones we provided are returned back.
+        // at any time. Instead, we only check that the ones we provided are returned.
         assert_eq!(
             attributes
                 .get("test_attributes_in_item_get")

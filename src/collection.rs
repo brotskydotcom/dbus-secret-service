@@ -26,15 +26,15 @@ use crate::{
 /// [`SecretService`] instance and cannot outlive it.
 pub struct Collection<'a> {
     service: &'a SecretService,
-    pub(crate) path: Path<'static>,
+    pub path: Path<'static>,
 }
 
 impl<'a> Collection<'a> {
-    pub(crate) fn new(service: &'a SecretService, path: Path<'static>) -> Collection<'a> {
+    pub fn new(service: &'a SecretService, path: Path<'static>) -> Collection<'a> {
         Collection { service, path }
     }
 
-    fn proxy(&self) -> Proxy<&Connection> {
+    fn proxy(&'_ self) -> Proxy<'_, &'_ Connection> {
         new_proxy(&self.service.connection, &self.path)
     }
 

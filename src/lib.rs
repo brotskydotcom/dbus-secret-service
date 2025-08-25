@@ -151,8 +151,8 @@ use dbus::arg::RefArg;
 use dbus::{
     arg::{PropMap, Variant},
     blocking::{Connection, Proxy},
-    strings::Path,
 };
+pub use dbus::strings::Path;
 pub use error::Error;
 pub use item::Item;
 use proxy::{new_proxy, service::Service};
@@ -232,6 +232,7 @@ impl SecretService {
     }
 
     /// Get all collections
+    #[allow(mismatched_lifetime_syntaxes)]
     pub fn get_all_collections(&self) -> Result<Vec<Collection>, Error> {
         let paths = self.proxy().collections()?;
         let collections = paths
@@ -241,11 +242,12 @@ impl SecretService {
         Ok(collections)
     }
 
-    /// Get collection by alias.
+    /// Get a collection by alias.
     ///
-    /// Most common would be the `default` alias, but there
+    /// The most common would be the `default` alias, but there
     /// is also a specific method for getting the collection
     /// by default alias.
+    #[allow(mismatched_lifetime_syntaxes)]
     pub fn get_collection_by_alias(&self, alias: &str) -> Result<Collection, Error> {
         let path = self.proxy().read_alias(alias)?;
         if path == Path::new("/")? {
@@ -255,7 +257,7 @@ impl SecretService {
         }
     }
 
-    /// Get default collection.
+    /// Get the default collection.
     /// (The collection whose alias is `default`)
     pub fn get_default_collection(&self) -> Result<Collection<'_>, Error> {
         self.get_collection_by_alias("default")
