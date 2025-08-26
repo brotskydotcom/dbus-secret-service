@@ -17,6 +17,11 @@ jobs:
           - "crypto-openssl,vendored"
 
     steps:
+      - name: install required packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev libssl-dev
+
       - name: Fetch head
         uses: actions/checkout@v5
 
@@ -32,6 +37,15 @@ jobs:
       - name: Clippy check
         run: cargo clippy --no-deps --all-targets -- -D warnings
 
+      - name: Install gnome-keyring
+        run: sudo apt-get install -y gnome-keyring
+
+      - name: Start gnome-keyring
+        # run gnome-keyring with 'foobar' as password for the login keyring
+        # this will create a new login keyring and unlock it
+        # the login password doesn't matter, but the keyring must be unlocked for the tests to work
+        run: gnome-keyring-daemon --components=secrets --daemonize --unlock <<< 'foobar'
+
       - name: Build and Test
         run: cargo test --no-default-features --features=${{ matrix.features }} --verbose
 
@@ -42,6 +56,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: install required packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev libssl-dev
+
       - name: Fetch head
         uses: actions/checkout@v5
 
