@@ -64,7 +64,7 @@
 //!        }
 //!    };
 //!
-//!    // retrieve secret from item
+//!    // retrieve secret from the item
 //!    let secret = item.get_secret().unwrap();
 //!    assert_eq!(secret, b"test_secret");
 //!
@@ -102,7 +102,7 @@
 //! be enforced by the Rust compiler.
 //!
 //! ### Collections and Items
-//! The Secret Service API organizes secrets into collections, and holds each secret
+//! The Secret Service API organizes secrets into collections and holds each secret
 //! in an item.
 //!
 //! Items consist of a label, attributes, and the secret. The most common way to find
@@ -146,13 +146,14 @@
 //!
 use std::collections::HashMap;
 
-pub use collection::Collection;
 use dbus::arg::RefArg;
+pub use dbus::strings::Path;
 use dbus::{
     arg::{PropMap, Variant},
     blocking::{Connection, Proxy},
 };
-pub use dbus::strings::Path;
+
+pub use collection::Collection;
 pub use error::Error;
 pub use item::Item;
 use proxy::{new_proxy, service::Service};
@@ -216,7 +217,7 @@ impl SecretService {
     /// it will only block for the given number of seconds,
     /// after which it will dismiss the prompt and cancel the operation.
     /// (Specifying 0 for the number of seconds will prevent the prompt
-    /// from appearing at all: the operation will immediately be cancelled.)
+    /// from appearing at all: the operation will immediately be canceled.)
     pub fn connect_with_max_prompt_timeout(
         encryption: EncryptionType,
         seconds: u64,
@@ -287,7 +288,7 @@ impl SecretService {
             SS_COLLECTION_LABEL.to_string(),
             Variant(Box::new(label.to_string()) as Box<dyn RefArg>),
         );
-        // create collection returning collection path and prompt path
+        // create a collection returning the collection path and prompt path
         let (c_path, p_path) = self.proxy().create_collection(properties, alias)?;
         let created = {
             if c_path == Path::new("/")? {
@@ -381,7 +382,8 @@ mod test {
         let _ = ss.get_any_collection().unwrap();
     }
 
-    #[test_with::no_env(GITHUB_ACTIONS)] // can't run headless - prompts
+    #[test]
+    #[ignore] // can't run headless - prompts
     fn should_create_and_delete_collection() {
         let ss = SecretService::connect(EncryptionType::Plain).unwrap();
         let test_collection = ss.create_collection("TestCreateDelete", "").unwrap();
@@ -425,7 +427,8 @@ mod test {
         item.delete().unwrap();
     }
 
-    #[test_with::no_env(GITHUB_ACTIONS)] // can't run headless - prompts
+    #[test]
+    #[ignore] // can't run headless - prompts
     fn should_lock_and_unlock() {
         // Assumes that there will always be at least one collection
         let ss = SecretService::connect(EncryptionType::Plain).unwrap();

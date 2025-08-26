@@ -147,7 +147,8 @@ mod test {
         let _ = collection.is_locked().unwrap();
     }
 
-    #[test_with::no_env(GITHUB_ACTIONS)] // can't run headless - prompts
+    #[test]
+    #[ignore] // can't run headless - prompts
     fn should_lock_and_unlock() {
         let ss = SecretService::connect(EncryptionType::Plain).unwrap();
         let collection = ss
@@ -159,7 +160,8 @@ mod test {
         collection.delete().unwrap();
     }
 
-    #[test_with::no_env(GITHUB_ACTIONS)] // can't run headless - prompts
+    #[test]
+    #[ignore] // can't run headless - prompts
     fn should_delete_collection() {
         let ss = SecretService::connect(EncryptionType::Plain).unwrap();
         ss.create_collection("TestDelete", "").unwrap();
@@ -221,7 +223,8 @@ mod test {
         item.delete().unwrap();
     }
 
-    #[test_with::no_env(GITHUB_ACTIONS)] // can't run headless - prompts
+    #[test]
+    #[ignore] // can't run headless - prompts
     fn should_get_and_set_collection_label() {
         let ss = SecretService::connect(EncryptionType::Plain).unwrap();
         let collection = ss.create_collection("TestGetSetLabel", "").unwrap();
