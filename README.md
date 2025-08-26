@@ -1,7 +1,6 @@
 # dbus-secret-service
 
 [![build](https://github.com/brotskydotcom/dbus-secret-service/actions/workflows/ci.yaml/badge.svg)](https://github.com/brotskydotcom/dbus-secret-service/actions)
-[![dependencies](https://deps.rs/repo/github/brotskydotcom/dbus-secret-service/status.svg)](https://deps.rs/repo/github/brotskydotcom/dbus-secret-service)
 [![crates.io](https://img.shields.io/crates/v/dbus-secret-service.svg?style=flat-square)](https://crates.io/crates/dbus-secret-service)
 [![docs.rs](https://docs.rs/dbus-secret-service/badge.svg)](https://docs.rs/dbus-secret-service)
 
