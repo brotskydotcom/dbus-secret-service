@@ -26,15 +26,15 @@ use crate::{
 /// [`SecretService`] instance and cannot outlive it.
 pub struct Collection<'a> {
     service: &'a SecretService,
-    pub(crate) path: Path<'static>,
+    pub path: Path<'static>,
 }
 
 impl<'a> Collection<'a> {
-    pub(crate) fn new(service: &'a SecretService, path: Path<'static>) -> Collection<'a> {
+    pub fn new(service: &'a SecretService, path: Path<'static>) -> Collection<'a> {
         Collection { service, path }
     }
 
-    fn proxy(&self) -> Proxy<&Connection> {
+    fn proxy(&'_ self) -> Proxy<'_, &'_ Connection> {
         new_proxy(&self.service.connection, &self.path)
     }
 
@@ -147,7 +147,8 @@ mod test {
         let _ = collection.is_locked().unwrap();
     }
 
-    #[test_with::no_env(GITHUB_ACTIONS)] // can't run headless - prompts
+    #[test]
+    #[ignore] // can't run headless - prompts
     fn should_lock_and_unlock() {
         let ss = SecretService::connect(EncryptionType::Plain).unwrap();
         let collection = ss
@@ -159,7 +160,8 @@ mod test {
         collection.delete().unwrap();
     }
 
-    #[test_with::no_env(GITHUB_ACTIONS)] // can't run headless - prompts
+    #[test]
+    #[ignore] // can't run headless - prompts
     fn should_delete_collection() {
         let ss = SecretService::connect(EncryptionType::Plain).unwrap();
         ss.create_collection("TestDelete", "").unwrap();
@@ -221,7 +223,8 @@ mod test {
         item.delete().unwrap();
     }
 
-    #[test_with::no_env(GITHUB_ACTIONS)] // can't run headless - prompts
+    #[test]
+    #[ignore] // can't run headless - prompts
     fn should_get_and_set_collection_label() {
         let ss = SecretService::connect(EncryptionType::Plain).unwrap();
         let collection = ss.create_collection("TestGetSetLabel", "").unwrap();

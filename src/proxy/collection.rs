@@ -1,3 +1,4 @@
+#![allow(dead_code, unused_imports)]
 // Copyright 2016-2024 dbus-secret-service Contributors
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
@@ -11,11 +12,9 @@
 // `dbus-codegen-rust -i org.freedesktop.Secret. --interfaces=org.freedesktop.Secret.Collection -c blocking`
 // See https://github.com/diwic/dbus-rs
 use dbus;
-#[allow(unused_imports)]
 use dbus::arg;
 use dbus::blocking;
 
-#[allow(dead_code)]
 pub trait Collection {
     fn delete(&self) -> Result<dbus::Path<'static>, dbus::Error>;
     fn search_items(
