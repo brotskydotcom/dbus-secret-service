@@ -233,8 +233,7 @@ impl SecretService {
     }
 
     /// Get all collections
-    #[allow(mismatched_lifetime_syntaxes)]
-    pub fn get_all_collections(&self) -> Result<Vec<Collection>, Error> {
+    pub fn get_all_collections(&'_ self) -> Result<Vec<Collection<'_>>, Error> {
         let paths = self.proxy().collections()?;
         let collections = paths
             .into_iter()
@@ -248,8 +247,7 @@ impl SecretService {
     /// The most common would be the `default` alias, but there
     /// is also a specific method for getting the collection
     /// by default alias.
-    #[allow(mismatched_lifetime_syntaxes)]
-    pub fn get_collection_by_alias(&self, alias: &str) -> Result<Collection, Error> {
+    pub fn get_collection_by_alias(&'_ self, alias: &str) -> Result<Collection<'_>, Error> {
         let path = self.proxy().read_alias(alias)?;
         if path == Path::new("/")? {
             Err(Error::NoResult)
