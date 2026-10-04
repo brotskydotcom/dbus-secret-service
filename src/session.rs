@@ -125,7 +125,7 @@ impl Session {
                 let keypair = crypto::Keypair::generate();
 
                 // send our public key with algorithm to service
-                let public_bytes = keypair.public.to_bytes_be();
+                let public_bytes = keypair.public_bytes();
                 let bytes_arg = Variant(Box::new(public_bytes) as Box<dyn RefArg>);
                 let (out, path) = p.open_session(ALGORITHM_DH, bytes_arg)?;
 
@@ -327,6 +327,16 @@ mod crypto {
             }
         }
 
+        /// The public key as a 128-byte big-endian value. A key whose leading
+        /// byte is zero would otherwise be sent short, and some services
+        /// (e.g. KWallet's ksecretd before 6.25) reject keys shorter than 128 bytes.
+        pub(super) fn public_bytes(&self) -> Vec<u8> {
+            let public_key_bytes = self.public.to_bytes_be();
+            let mut public_key_padded = vec![0; 128 - public_key_bytes.len()];
+            public_key_padded.extend(public_key_bytes);
+            public_key_padded
+        }
+
         pub(super) fn derive_shared(&self, server_public_key_bytes: &[u8]) -> AesKey {
             // Derive the shared secret the server and us.
             let server_public_key = BigUint::from_bytes_be(server_public_key_bytes);
@@ -422,5 +432,20 @@ mod test {
         let proxy = new_proxy(&connection, SS_DBUS_PATH);
         let session = Session::new(proxy, EncryptionType::Dh).unwrap();
         assert!(session.is_encrypted());
+    }
+
+    #[cfg(any(feature = "crypto-rust", feature = "crypto-openssl"))]
+    #[test]
+    fn should_pad_public_key_to_128_bytes() {
+        use num::{bigint::BigUint, FromPrimitive};
+
+        let keypair = crypto::Keypair {
+            private: BigUint::from_u8(1).unwrap(),
+            public: BigUint::from_u8(2).unwrap(),
+        };
+        let bytes = keypair.public_bytes();
+        assert_eq!(bytes.len(), 128);
+        assert_eq!(bytes[127], 2);
+        assert!(bytes[..127].iter().all(|b| *b == 0));
     }
 }
